@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum EventoTipo {
+  RUNNING
+  ATLETISMO
+  CICLISMO
+}
+
+enum EventoStatus {
+  PROXIMO
+  ACTIVO
+  COMPLETADO
+}
+
+enum OrdenStatus {
+  PENDIENTE
+  PAGADO
+  CANCELADO
+}
+
+enum PaymentMethod {
+  PAYPHONE
+  STRIPE
+}
+
+enum NotificationType {
+  COMPRA
+  PREVIEW
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  ENVIADO
+  FALLIDO
+}
+
+model User {
+  id             String    @id @default(cuid())
+  nombre         String
+  email          String    @unique
+  phone          String?
+  password       String
+  role           Role      @default(USER)
+  face_vector    String?
+  avatar_url     String?
+  email_verified Boolean   @default(false)
+  phone_verified Boolean   @default(false)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  eventos        Event[]
+  ordenes        Order[]
+  face_matches   FaceMatch[]
+  notificaciones Notification[]
+
+  @@map("users")
+}
+
+model Event {
+  id          String       @id @default(cuid())
+  nombre      String
+  descripcion String?
+  fecha       DateTime
+  ciudad      String
+  tipo        EventoTipo
+  cover_url   String?
+  status      EventoStatus @default(PROXIMO)
+  admin_id    String
+  created_at  DateTime     @default(now())
+
+  admin       User         @relation(fields: [admin_id], references: [id])
+  fotos       Photo[]
+  packages    Package[]
+  ordenes     Order[]
+
+  @@map("events")
+}
+
+model Photo {
+  id                String    @id @default(cuid())
+  event_id          String
+  gcs_original_url  String
+  gcs_watermark_url String?
+  processed_at      DateTime?
+  created_at        DateTime  @default(now())
+
+  evento       Event       @relation(fields: [event_id], references: [id])
+  face_matches FaceMatch[]
+  order_photos OrderPhoto[]
+
+  @@map("photos")
+}
+
+model FaceMatch {
+  id               String   @id @default(cuid())
+  photo_id         String
+  user_id          String
+  confidence_score Float
+  created_at       DateTime @default(now())
+
+  foto  Photo @relation(fields: [photo_id], references: [id])
+  user  User  @relation(fields: [user_id], references: [id])
+
+  @@map("face_matches")
+}
+
+model Package {
+  id          String   @id @default(cuid())
+  event_id    String
+  nombre      String
+  photo_count Int
+  price_usd   Float
+  created_at  DateTime @default(now())
+
+  evento  Event   @relation(fields: [event_id], references: [id])
+  ordenes Order[]
+
+  @@map("packages")
+}
+
+model Order {
+  id             String        @id @default(cuid())
+  user_id        String
+  event_id       String
+  package_id     String?
+  total_usd      Float
+  status         OrdenStatus   @default(PENDIENTE)
+  payment_method PaymentMethod
+  paid_at        DateTime?
+  created_at     DateTime      @default(now())
+
+  user     User         @relation(fields: [user_id], references: [id])
+  evento   Event        @relation(fields: [event_id], references: [id])
+  package  Package?     @relation(fields: [package_id], references: [id])
+  fotos    OrderPhoto[]
+
+  @@map("orders")
+}
+
+model OrderPhoto {
+  id       String @id @default(cuid())
+  order_id String
+  photo_id String
+
+  orden Order @relation(fields: [order_id], references: [id])
+  foto  Photo @relation(fields: [photo_id], references: [id])
+
+  @@map("order_photos")
+}
+
+model Notification {
+  id      String              @id @default(cuid())
+  user_id String
+  type    NotificationType
+  channel NotificationChannel
+  status  NotificationStatus
+  sent_at DateTime?
+  created_at DateTime         @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("notifications")
+}

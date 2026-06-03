@@ -1,7 +1,13 @@
 import { Router } from 'express';
+import { obtenerUsuario, actualizarUsuario } from '../controllers/usuarios.controller';
+import { verificarToken } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// GET /usuarios/:id, PUT /usuarios/:id
+// GET /api/usuarios/:id
+router.get('/:id', verificarToken, obtenerUsuario);
+
+// PUT /api/usuarios/:id
+router.put('/:id', verificarToken, actualizarUsuario);
 
 export default router;
