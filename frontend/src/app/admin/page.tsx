@@ -32,6 +32,14 @@ export default function AdminPage() {
     tipo: 'RUNNING', descripcion: '', cover_url: ''
   });
 
+  // Estados para subir fotos
+  const [eventoSeleccionado, setEventoSeleccionado] = useState<string | null>(null);
+  const [mostrarFormFoto, setMostrarFormFoto] = useState(false);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [formFoto, setFormFoto] = useState({ gcs_original_url: '', gcs_watermark_url: '' });
+  const [archivoFoto, setArchivoFoto] = useState<File | null>(null);
+  const [previewFoto, setPreviewFoto] = useState<string>('');
+
   useEffect(() => { cargarEventos(); }, []);
 
   const cargarEventos = async () => {
@@ -62,8 +70,70 @@ export default function AdminPage() {
     }
   };
 
+  const subirFoto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eventoSeleccionado) return;
+    setSubiendoFoto(true);
+    try {
+      let urlFoto = formFoto.gcs_original_url;
+
+      if (archivoFoto) {
+        const formData = new FormData();
+        formData.append('foto', archivoFoto);
+        const token = localStorage.getItem('token');
+        const res = await fetch('http://localhost:3001/api/upload/foto', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData
+        });
+        const data = await res.json();
+        if (!data.exito) throw new Error(data.mensaje);
+        urlFoto = data.datos.url;
+      }
+
+      if (!urlFoto) {
+        toast.error('Selecciona una foto o ingresa una URL');
+        setSubiendoFoto(false);
+        return;
+      }
+
+      await api.post('/fotos', {
+        event_id: eventoSeleccionado,
+        gcs_original_url: urlFoto,
+        ...(formFoto.gcs_watermark_url && { gcs_watermark_url: formFoto.gcs_watermark_url })
+      });
+
+      toast.success('¡Foto agregada exitosamente!');
+      setMostrarFormFoto(false);
+      setFormFoto({ gcs_original_url: '', gcs_watermark_url: '' });
+      setArchivoFoto(null);
+      setPreviewFoto('');
+      cargarEventos();
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { mensaje?: string } } };
+      toast.error(error.response?.data?.mensaje || 'Error al subir foto');
+    } finally {
+      setSubiendoFoto(false);
+    }
+  };
+
+  const manejarArchivo = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Solo se permiten imágenes');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('La imagen no puede superar 10MB');
+      return;
+    }
+    setArchivoFoto(file);
+    setPreviewFoto(URL.createObjectURL(file));
+    setFormFoto({ ...formFoto, gcs_original_url: '' });
+  };
+
   const eventosFiltrados = eventos.filter(e => {
-    const matchBusqueda = e.nombre.toLowerCase().includes(busqueda.toLowerCase()) || e.ciudad.toLowerCase().includes(busqueda.toLowerCase());
+    const matchBusqueda = e.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+      e.ciudad.toLowerCase().includes(busqueda.toLowerCase());
     const matchTipo = filtroTipo === 'TODOS' || e.tipo === filtroTipo;
     const matchStatus = filtroStatus === 'TODOS' || e.status === filtroStatus;
     return matchBusqueda && matchTipo && matchStatus;
@@ -75,12 +145,18 @@ export default function AdminPage() {
     return { backgroundColor: '#6b7280', color: 'white' };
   };
 
+  const cerrarModalFoto = () => {
+    setMostrarFormFoto(false);
+    setFormFoto({ gcs_original_url: '', gcs_watermark_url: '' });
+    setArchivoFoto(null);
+    setPreviewFoto('');
+  };
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#0f172a' }}>
 
       {/* SIDEBAR */}
       <div style={{ width: '240px', backgroundColor: '#1e293b', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
-        {/* Logo */}
         <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
             <img src="/Logo.png" alt="FR" style={{ width: '32px', height: '32px', objectFit: 'contain' }}
@@ -89,32 +165,30 @@ export default function AdminPage() {
           </Link>
         </div>
 
-        {/* Nav */}
         <nav style={{ padding: '16px 12px', flex: 1 }}>
           {[
-            { icon: <LayoutDashboard size={18} />, label: 'Mis galerías', active: true },
-            { icon: <Camera size={18} />, label: 'Fotos', active: false },
-            { icon: <Users size={18} />, label: 'Usuarios registrados', active: false },
-            { icon: <Filter size={18} />, label: 'Facial cloud', active: false },
-            { icon: <Image size={18} />, label: 'Mi monitor', active: false },
-            { icon: <Settings size={18} />, label: 'Configuración', active: false },
+            { icon: <LayoutDashboard size={18} />, label: 'Mis galerías', href: '/admin', active: true },
+            { icon: <Camera size={18} />, label: 'Fotos', href: '/admin/fotos', active: false },
+            { icon: <Users size={18} />, label: 'Usuarios registrados', href: '/admin/usuarios', active: false },
+            { icon: <Filter size={18} />, label: 'Facial cloud', href: '/admin/facial', active: false },
+            { icon: <Image size={18} />, label: 'Mi monitor', href: '/admin/monitor', active: false },
+            { icon: <Settings size={18} />, label: 'Configuración', href: '/admin/configuracion', active: false },
           ].map((item) => (
-            <button key={item.label}
-              onClick={() => item.active ? null : toast('Próximamente')}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
-                padding: '10px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+            <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '12px',
+                padding: '10px 12px', borderRadius: '10px',
                 backgroundColor: item.active ? '#FF6B00' : 'transparent',
                 color: item.active ? 'white' : 'rgba(255,255,255,0.5)',
                 fontSize: '14px', fontWeight: item.active ? 700 : 500,
-                marginBottom: '4px', textAlign: 'left',
+                marginBottom: '4px', cursor: 'pointer',
               }}>
-              {item.icon} {item.label}
-            </button>
+                {item.icon} {item.label}
+              </div>
+            </Link>
           ))}
         </nav>
 
-        {/* Cerrar sesión */}
         <div style={{ padding: '16px 12px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
           <button onClick={cerrarSesion}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: '14px', fontWeight: 500 }}>
@@ -143,16 +217,12 @@ export default function AdminPage() {
           <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Filter size={14} /> Filtros
           </span>
-
-          {/* Buscador */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '8px', padding: '8px 12px' }}>
             <Search size={14} color="rgba(255,255,255,0.4)" />
             <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Nombre de la galería..."
               style={{ background: 'none', border: 'none', outline: 'none', color: 'white', fontSize: '13px', width: '180px' }} />
           </div>
-
-          {/* Tipo */}
           <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}
             style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', padding: '8px 12px', color: 'rgba(255,255,255,0.7)', fontSize: '13px', cursor: 'pointer' }}>
             <option value="TODOS">Todos los tipos</option>
@@ -160,8 +230,6 @@ export default function AdminPage() {
             <option value="ATLETISMO">Atletismo</option>
             <option value="CICLISMO">Ciclismo</option>
           </select>
-
-          {/* Status */}
           <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)}
             style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', padding: '8px 12px', color: 'rgba(255,255,255,0.7)', fontSize: '13px', cursor: 'pointer' }}>
             <option value="TODOS">Todos los estados</option>
@@ -169,58 +237,47 @@ export default function AdminPage() {
             <option value="ACTIVO">Activo</option>
             <option value="COMPLETADO">Completado</option>
           </select>
-
           <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', marginLeft: 'auto' }}>
             {eventosFiltrados.length} de {eventos.length} galerías
           </span>
         </div>
 
-        {/* GRID GALERÍAS */}
+        {/* GRID */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
           {cargando ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
               {[...Array(6)].map((_, i) => (
-                <div key={i} style={{ backgroundColor: '#1e293b', borderRadius: '16px', aspectRatio: '16/10', animation: 'pulse 2s infinite' }} />
+                <div key={i} style={{ backgroundColor: '#1e293b', borderRadius: '16px', aspectRatio: '16/10' }} />
               ))}
             </div>
           ) : eventosFiltrados.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '80px', color: 'rgba(255,255,255,0.3)' }}>
-              <Image size={64} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
               <p style={{ fontWeight: 700, fontSize: '18px', marginBottom: '8px' }}>No hay galerías</p>
-              <p style={{ fontSize: '14px' }}>Crea tu primera galería de fotos</p>
+              <p style={{ fontSize: '14px', marginBottom: '20px' }}>Crea tu primera galería de fotos</p>
               <button onClick={() => setMostrarForm(true)}
-                style={{ marginTop: '20px', backgroundColor: '#FF6B00', color: 'white', border: 'none', borderRadius: '10px', padding: '12px 24px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+                style={{ backgroundColor: '#FF6B00', color: 'white', border: 'none', borderRadius: '10px', padding: '12px 24px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
                 + Crear galería
               </button>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
               {eventosFiltrados.map((evento) => (
-                <div key={evento.id} style={{ backgroundColor: '#1e293b', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', transition: 'transform 0.2s' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}>
-
-                  {/* Foto portada */}
+                <div key={evento.id} style={{ backgroundColor: '#1e293b', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ position: 'relative', aspectRatio: '16/10', backgroundColor: '#0f172a', overflow: 'hidden' }}>
                     {evento.cover_url ? (
-                      <img src={evento.cover_url} alt={evento.nombre}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={evento.cover_url} alt={evento.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
                       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #1e3a5f, #7c2d12)' }}>
                         <Image size={40} color="rgba(255,255,255,0.2)" />
                       </div>
                     )}
-                    {/* Status badge */}
                     <span style={{ position: 'absolute', top: '10px', right: '10px', ...colorStatus(evento.status), fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px' }}>
                       {evento.status}
                     </span>
-                    {/* Tipo badge */}
                     <span style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px' }}>
                       {evento.tipo}
                     </span>
                   </div>
-
-                  {/* Info */}
                   <div style={{ padding: '16px' }}>
                     <h3 style={{ color: 'white', fontWeight: 800, fontSize: '15px', marginBottom: '8px', lineHeight: 1.3 }}>
                       {evento.nombre}
@@ -242,7 +299,7 @@ export default function AdminPage() {
                           style={{ padding: '6px 12px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', textDecoration: 'none', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: 600 }}>
                           Ver
                         </Link>
-                        <button onClick={() => toast('Subida de fotos próximamente')}
+                        <button onClick={() => { setEventoSeleccionado(evento.id); setMostrarFormFoto(true); }}
                           style={{ padding: '6px 12px', backgroundColor: '#FF6B00', border: 'none', borderRadius: '8px', color: 'white', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
                           + Fotos
                         </button>
@@ -274,11 +331,9 @@ export default function AdminPage() {
                     value={form[campo.key as keyof typeof form]}
                     onChange={(e) => setForm({ ...form, [campo.key]: e.target.value })}
                     placeholder={campo.placeholder}
-                    style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }}
-                  />
+                    style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }} />
                 </div>
               ))}
-
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Tipo de evento</label>
                 <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}
@@ -288,14 +343,12 @@ export default function AdminPage() {
                   <option value="CICLISMO">Ciclismo</option>
                 </select>
               </div>
-
               <div style={{ marginBottom: '24px' }}>
                 <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Descripción (opcional)</label>
                 <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
                   placeholder="Descripción del evento..." rows={3}
                   style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box', resize: 'vertical' }} />
               </div>
-
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button type="button" onClick={() => setMostrarForm(false)}
                   style={{ flex: 1, border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
@@ -310,6 +363,103 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL SUBIR FOTO */}
+      {mostrarFormFoto && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ backgroundColor: '#1e293b', borderRadius: '20px', padding: '32px', width: '100%', maxWidth: '480px', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'white', marginBottom: '8px' }}>Subir foto</h2>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px' }}>
+              Sube desde tu PC o ingresa una URL
+            </p>
+            <form onSubmit={subirFoto}>
+
+              {/* Zona arrastrar/subir */}
+              <div
+                onClick={() => document.getElementById('inputFoto')?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files[0];
+                  if (file) manejarArchivo(file);
+                }}
+                style={{
+                  border: '2px dashed rgba(255,255,255,0.15)', borderRadius: '12px',
+                  padding: '24px', textAlign: 'center', cursor: 'pointer',
+                  marginBottom: '16px', backgroundColor: 'rgba(255,255,255,0.03)'
+                }}>
+                <input id="inputFoto" type="file" accept="image/jpeg,image/png,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) manejarArchivo(file);
+                  }} />
+                {previewFoto ? (
+                  <img src={previewFoto} alt="preview"
+                    style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '8px' }} />
+                ) : (
+                  <>
+                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>📸</div>
+                    <p style={{ color: 'white', fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
+                      Arrastra una foto aquí
+                    </p>
+                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>
+                      o haz clic para seleccionar · JPG, PNG, WEBP · máx 10MB
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {archivoFoto && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>📁 {archivoFoto.name}</span>
+                  <button type="button" onClick={() => { setArchivoFoto(null); setPreviewFoto(''); }}
+                    style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>✕</button>
+                </div>
+              )}
+
+              {/* Separador O */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.1)' }} />
+                <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>o ingresa URL</span>
+                <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.1)' }} />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <input type="url" value={formFoto.gcs_original_url}
+                  onChange={(e) => {
+                    setFormFoto({ ...formFoto, gcs_original_url: e.target.value });
+                    if (e.target.value) { setArchivoFoto(null); setPreviewFoto(''); }
+                  }}
+                  placeholder="https://images.unsplash.com/..."
+                  style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {formFoto.gcs_original_url && (
+                <div style={{ marginBottom: '16px' }}>
+                  <img src={formFoto.gcs_original_url} alt="preview"
+                    style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px' }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button type="button" onClick={cerrarModalFoto}
+                  style={{ flex: 1, border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
+                  Cancelar
+                </button>
+                <button type="submit"
+                  disabled={subiendoFoto || (!archivoFoto && !formFoto.gcs_original_url)}
+                  style={{ flex: 1, backgroundColor: subiendoFoto || (!archivoFoto && !formFoto.gcs_original_url) ? '#444' : '#FF6B00', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+                  {subiendoFoto ? 'Subiendo...' : 'Agregar foto'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

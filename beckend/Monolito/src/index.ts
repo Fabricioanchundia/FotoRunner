@@ -10,6 +10,9 @@ import usuariosRoutes from './routes/usuarios.routes';
 import eventosRoutes from './routes/eventos.routes';
 import fotosRoutes from './routes/fotos.routes';
 import ordenesRoutes from './routes/ordenes.routes';
+import uploadRoutes from './routes/upload.routes';
+import adminRoutes from './routes/admin.routes';
+import path from 'path';
 
 dotenv.config();
 
@@ -33,10 +36,13 @@ app.use(rateLimit({
 
 // Rutas
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/eventos', eventosRoutes);
 app.use('/api/fotos', fotosRoutes);
 app.use('/api/ordenes', ordenesRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Ruta de salud
 app.get('/health', (_req, res) => {

@@ -15,20 +15,25 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '' });
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCargando(true);
-    try {
-      const { data } = await api.post('/auth/login', form);
-      guardarToken(data.datos.token);
-      toast.success('¡Bienvenido!');
+  e.preventDefault();
+  setCargando(true);
+  try {
+    const { data } = await api.post('/auth/login', form);
+    guardarToken(data.datos.token);
+    toast.success('¡Bienvenido!');
+    // Redirigir según el rol
+    if (data.datos.usuario.role === 'ADMIN') {
+      router.push('/admin');
+    } else {
       router.push('/perfil');
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { mensaje?: string } } };
-      toast.error(error.response?.data?.mensaje || 'Credenciales incorrectas');
-    } finally {
-      setCargando(false);
     }
-  };
+  } catch (err: unknown) {
+    const error = err as { response?: { data?: { mensaje?: string } } };
+    toast.error(error.response?.data?.mensaje || 'Credenciales incorrectas');
+  } finally {
+    setCargando(false);
+  }
+};
 
   return (
     <div className="min-h-screen flex bg-white">
