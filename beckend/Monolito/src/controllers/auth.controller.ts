@@ -1,156 +1,173 @@
 import { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-import { z } from 'zod';
 import { responderExito, responderError } from '../utils/response';
 import logger from '../utils/logger';
+import { RequestAutenticado } from '../middlewares/auth.middleware';
 
 const prisma = new PrismaClient();
 
-// Schemas de validación
-const schemaRegistro = z.object({
-  nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-  email: z.string().email('Email inválido'),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
-  phone: z.string().optional()
-});
+const codigosVerificacion = new Map<string, {
+  codigo: string;
+  expires: Date;
+  userId: string;
+}>();
 
-const schemaLogin = z.object({
-  email: z.string().email('Email inválido'),
-  password: z.string().min(1, 'La contraseña es requerida')
-});
+const generarCodigo = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-const generarToken = (id: string, email: string, role: string): string => {
-  const secret = process.env.JWT_SECRET!;
-  return jwt.sign({ id, email, role }, secret, {
-    expiresIn: '24h'
-  });
-};
-
-export const registro = async (req: Request, res: Response): Promise<void> => {
+export const registrar = async (req: Request, res: Response): Promise<void> => {
   try {
-    const datos = schemaRegistro.safeParse(req.body);
-    if (!datos.success) {
-      responderError(res, 'Datos inválidos', 400, datos.error.issues);
+    const { nombre, email, phone, password } = req.body;
+
+    const emailExiste = await prisma.user.findUnique({ where: { email } });
+    if (emailExiste) {
+      responderError(res, 'Este correo ya está registrado', 400);
       return;
     }
 
-    const { nombre, email, password, phone } = datos.data;
-
-    // Verificar si el email ya existe
-    const usuarioExistente = await prisma.user.findUnique({
-      where: { email }
-    });
-
-    if (usuarioExistente) {
-      responderError(res, 'El email ya está registrado', 409);
-      return;
+    if (phone) {
+      const phoneExiste = await prisma.user.findFirst({ where: { phone } });
+      if (phoneExiste) {
+        responderError(res, 'Este teléfono ya está registrado', 400);
+        return;
+      }
     }
 
-    // Cifrar contraseña
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    // Crear usuario
+    const hash = await bcrypt.hash(password, 10);
     const usuario = await prisma.user.create({
       data: {
         nombre,
         email,
-        password: passwordHash,
-        phone: phone ?? null
-      },
-      select: {
-        id: true,
-        nombre: true,
-        email: true,
-        phone: true,
-        role: true,
-        created_at: true
+        phone: phone || null,
+        password: hash,
+        role: 'USER'
       }
     });
 
-    const token = generarToken(usuario.id, usuario.email, usuario.role);
+    const codigo = generarCodigo();
+    const expires = new Date(Date.now() + 15 * 60 * 1000);
+    codigosVerificacion.set(email, { codigo, expires, userId: usuario.id });
 
-    logger.info(`Nuevo usuario registrado: ${email}`);
-    responderExito(res, { usuario, token }, 'Usuario registrado exitosamente', 201);
+    logger.info(`[VERIFICACION] Código para ${email}: ${codigo}`);
+
+    const token = jwt.sign(
+      { id: usuario.id, role: usuario.role },
+      process.env['JWT_SECRET'] || 'secret',
+      { expiresIn: '7d' }
+    );
+
+    responderExito(res, {
+      token,
+      usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, role: usuario.role },
+      verificacionPendiente: true,
+      codigoDesarrollo: process.env['NODE_ENV'] !== 'production' ? codigo : undefined
+    }, 'Usuario registrado. Verifica tu correo.');
   } catch (error) {
-    logger.error(`Error en registro: ${error}`);
+    logger.error(`Error registro: ${error}`);
     responderError(res, 'Error al registrar usuario', 500);
   }
 };
 
-export const login = async (req: Request, res: Response): Promise<void> => {
+export const verificarCodigo = async (req: Request, res: Response): Promise<void> => {
   try {
-    const datos = schemaLogin.safeParse(req.body);
-    if (!datos.success) {
-      responderError(res, 'Datos inválidos', 400, datos.error.issues);
+    const { email, codigo } = req.body;
+
+    const verificacion = codigosVerificacion.get(email);
+
+    if (!verificacion) {
+      responderError(res, 'Código expirado o inválido. Solicita uno nuevo.', 400);
       return;
     }
 
-    const { email, password } = datos.data;
+    if (verificacion.expires < new Date()) {
+      codigosVerificacion.delete(email);
+      responderError(res, 'El código ha expirado. Solicita uno nuevo.', 400);
+      return;
+    }
 
-    // Buscar usuario
-    const usuario = await prisma.user.findUnique({
-      where: { email }
+    if (verificacion.codigo !== String(codigo)) {
+      responderError(res, 'Código incorrecto', 400);
+      return;
+    }
+
+    await prisma.user.update({
+      where: { id: verificacion.userId },
+      data: { email_verified: true }
     });
 
-    if (!usuario) {
-      responderError(res, 'Credenciales incorrectas', 401);
-      return;
-    }
-
-    // Verificar contraseña
-    const passwordValida = await bcrypt.compare(password, usuario.password);
-    if (!passwordValida) {
-      responderError(res, 'Credenciales incorrectas', 401);
-      return;
-    }
-
-    const token = generarToken(usuario.id, usuario.email, usuario.role);
-
-    logger.info(`Login exitoso: ${email}`);
-    responderExito(res, {
-      token,
-      usuario: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        email: usuario.email,
-        role: usuario.role
-      }
-    }, 'Login exitoso');
+    codigosVerificacion.delete(email);
+    responderExito(res, null, 'Correo verificado correctamente');
   } catch (error) {
-    logger.error(`Error en login: ${error}`);
-    responderError(res, 'Error al iniciar sesión', 500);
+    logger.error(`Error verificación: ${error}`);
+    responderError(res, 'Error al verificar código', 500);
   }
 };
 
-export const perfil = async (req: Request, res: Response): Promise<void> => {
+export const reenviarCodigo = async (req: Request, res: Response): Promise<void> => {
   try {
-    const usuarioReq = (req as Request & { usuario?: { id: string } }).usuario;
+    const { email } = req.body;
 
-    const usuario = await prisma.user.findUnique({
-      where: { id: usuarioReq?.id },
-      select: {
-        id: true,
-        nombre: true,
-        email: true,
-        phone: true,
-        role: true,
-        avatar_url: true,
-        email_verified: true,
-        phone_verified: true,
-        created_at: true
-      }
-    });
-
+    const usuario = await prisma.user.findUnique({ where: { email } });
     if (!usuario) {
       responderError(res, 'Usuario no encontrado', 404);
       return;
     }
 
-    responderExito(res, usuario, 'Perfil obtenido exitosamente');
+    const codigo = generarCodigo();
+    const expires = new Date(Date.now() + 15 * 60 * 1000);
+    codigosVerificacion.set(email, { codigo, expires, userId: usuario.id });
+
+    logger.info(`[VERIFICACION] Nuevo código para ${email}: ${codigo}`);
+
+    responderExito(res, {
+      codigoDesarrollo: process.env['NODE_ENV'] !== 'production' ? codigo : undefined
+    }, 'Código reenviado');
   } catch (error) {
-    logger.error(`Error al obtener perfil: ${error}`);
+    logger.error(`Error reenvío: ${error}`);
+    responderError(res, 'Error al reenviar código', 500);
+  }
+};
+
+export const login = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, password } = req.body;
+
+    const usuario = await prisma.user.findUnique({ where: { email } });
+    if (!usuario || !await bcrypt.compare(password, usuario.password)) {
+      responderError(res, 'Credenciales incorrectas', 401);
+      return;
+    }
+
+    const token = jwt.sign(
+      { id: usuario.id, role: usuario.role },
+      process.env['JWT_SECRET'] || 'secret',
+      { expiresIn: '7d' }
+    );
+
+    responderExito(res, {
+      token,
+      usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, role: usuario.role }
+    }, 'Login exitoso');
+  } catch (error) {
+    logger.error(`Error login: ${error}`);
+    responderError(res, 'Error al iniciar sesión', 500);
+  }
+};
+
+export const perfil = async (req: RequestAutenticado, res: Response): Promise<void> => {
+  try {
+    const usuario = await prisma.user.findUnique({
+      where: { id: req.usuario?.id },
+      select: {
+        id: true, nombre: true, email: true, phone: true,
+        role: true, avatar_url: true, email_verified: true, created_at: true
+      }
+    });
+    if (!usuario) { responderError(res, 'Usuario no encontrado', 404); return; }
+    responderExito(res, usuario, 'Perfil obtenido');
+  } catch (error) {
+    logger.error(`Error perfil: ${error}`);
     responderError(res, 'Error al obtener perfil', 500);
   }
 };
