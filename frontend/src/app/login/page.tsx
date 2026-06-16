@@ -12,8 +12,8 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect');
 
-  const [verPassword, setVerPassword] = useState(false);
   const [cargando, setCargando] = useState(false);
+  const [verPassword, setVerPassword] = useState(false);
   const [form, setForm] = useState({ email: '', password: '' });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -21,14 +21,15 @@ export default function LoginPage() {
     setCargando(true);
     try {
       const { data } = await api.post('/auth/login', form);
-      guardarToken(data.datos.token);
+      const { token, usuario } = data.datos;
+
+      guardarToken(token, usuario.role);
       toast.success('¡Bienvenido!');
-      if (redirect) {
-        router.push(redirect);
-      } else if (data.datos.usuario.role === 'ADMIN') {
+
+      if (usuario.role === 'ADMIN' || usuario.role === 'HELPER') {
         router.push('/admin');
       } else {
-        router.push('/');
+        router.push(redirect || '/');
       }
     } catch (err: unknown) {
       const error = err as { response?: { data?: { mensaje?: string } } };
@@ -39,85 +40,87 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: 'sans-serif' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: 'white' }}>
 
-      {/* Foto izquierda */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <img
-          src="https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=800&h=1200&fit=crop"
-          alt="running"
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, transparent 60%, rgba(255,255,255,0.05))' }} />
-      </div>
+      {/* FORMULARIO — Izquierda */}
+      <div style={{ width: '100%', maxWidth: '560px', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '48px 40px', backgroundColor: 'white' }}>
+        <div style={{ maxWidth: '360px', width: '100%', margin: '0 auto' }}>
 
-      {/* Formulario */}
-      <div style={{ width: '100%', maxWidth: '520px', backgroundColor: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '48px 40px' }}>
-
-        {/* Logo */}
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', marginBottom: '40px' }}>
-          <div style={{ width: '36px', height: '36px', backgroundColor: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src="/Logo.png" alt="FR" style={{ width: '30px', height: '30px', objectFit: 'contain' }}
+          {/* Logo */}
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', marginBottom: '40px' }}>
+            <img src="/Logo.png" alt="FotoRunner"
+              style={{ width: '44px', height: '44px', objectFit: 'contain' }}
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          </div>
-          <span style={{ fontWeight: 800, fontSize: '18px', color: '#0f172a', letterSpacing: '1px' }}>FOTORUNNER</span>
-        </Link>
+            <span style={{ fontWeight: 800, fontSize: '22px', color: '#0f172a', letterSpacing: '2px' }}>
+              FOTORUNNER
+            </span>
+          </Link>
 
-        <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', marginBottom: '6px' }}>Iniciar sesión</h1>
-        <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '28px' }}>Bienvenido de vuelta</p>
+          <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+            Inicia sesión
+          </h1>
+          <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '32px' }}>
+            Empieza a disfrutar de tus recuerdos
+          </p>
 
-        <form onSubmit={handleSubmit}>
-          {/* Email */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
-              Email
-            </label>
-            <input
-              type="email" required value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="tu@email.com"
-              style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '12px 16px', fontSize: '14px', color: '#0f172a', outline: 'none', boxSizing: 'border-box', backgroundColor: '#f8fafc' }}
-              onFocus={(e) => { e.target.style.borderColor = '#0ea5e9'; e.target.style.backgroundColor = 'white'; }}
-              onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; e.target.style.backgroundColor = '#f8fafc'; }}
-            />
-          </div>
+          <form onSubmit={handleSubmit}>
 
-          {/* Contraseña */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
-              Contraseña
-            </label>
-            <div style={{ position: 'relative' }}>
+            {/* Email */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>
+                Email
+              </label>
               <input
-                type={verPassword ? 'text' : 'password'} required value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="Tu contraseña"
-                style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '12px 48px 12px 16px', fontSize: '14px', color: '#0f172a', outline: 'none', boxSizing: 'border-box', backgroundColor: '#f8fafc' }}
-                onFocus={(e) => { e.target.style.borderColor = '#0ea5e9'; e.target.style.backgroundColor = 'white'; }}
-                onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; e.target.style.backgroundColor = '#f8fafc'; }}
+                type="email" required
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="johndoe@gmail.com"
+                style={{ width: '100%', border: '2px solid #e5e7eb', borderRadius: '12px', padding: '12px 16px', fontSize: '14px', color: '#0f172a', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
+                onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#0ea5e9'; }}
+                onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#e5e7eb'; }}
               />
-              <button type="button" onClick={() => setVerPassword(!verPassword)}
-                style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                {verPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
             </div>
-          </div>
 
-          <button type="submit" disabled={cargando}
-            style={{ width: '100%', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: 700, cursor: cargando ? 'not-allowed' : 'pointer', opacity: cargando ? 0.7 : 1, marginBottom: '16px' }}>
-            {cargando ? 'Iniciando...' : 'Iniciar sesión'}
-          </button>
+            {/* Contraseña */}
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>
+                Contraseña
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={verPassword ? 'text' : 'password'} required
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="Introduce tu contraseña aquí"
+                  style={{ width: '100%', border: '2px solid #e5e7eb', borderRadius: '12px', padding: '12px 48px 12px 16px', fontSize: '14px', color: '#0f172a', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
+                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#0ea5e9'; }}
+                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#e5e7eb'; }}
+                />
+                <button type="button" onClick={() => setVerPassword(!verPassword)}
+                  style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                  {verPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Botón */}
+            <button type="submit" disabled={cargando}
+              style={{ width: '100%', backgroundColor: cargando ? '#cbd5e1' : '#0ea5e9', background: cargando ? '#cbd5e1' : 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '12px', padding: '14px', fontSize: '15px', fontWeight: 700, cursor: cargando ? 'not-allowed' : 'pointer', marginBottom: '20px', transition: 'opacity 0.2s' }}>
+              {cargando ? 'Ingresando...' : 'Confirmar'}
+            </button>
+          </form>
 
           {/* Separador */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
-            <span style={{ color: '#94a3b8', fontSize: '12px' }}>o</span>
-            <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
+            <div style={{ flex: 1, height: '1px', backgroundColor: '#e5e7eb' }} />
+            <span style={{ color: '#9ca3af', fontSize: '12px' }}>o</span>
+            <div style={{ flex: 1, height: '1px', backgroundColor: '#e5e7eb' }} />
           </div>
 
           {/* Google */}
-          <button type="button" onClick={() => toast('Google Auth próximamente')}
-            style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '13px', fontSize: '14px', fontWeight: 600, color: '#374151', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '24px' }}>
+          <button
+            onClick={() => toast('Google Auth próximamente', { icon: '🔜' })}
+            style={{ width: '100%', border: '2px solid #e5e7eb', borderRadius: '12px', padding: '13px', fontSize: '14px', fontWeight: 600, color: '#374151', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '24px' }}>
             <svg width="18" height="18" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -128,14 +131,38 @@ export default function LoginPage() {
           </button>
 
           <p style={{ textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
-            ¿No tienes cuenta?{' '}
-            <Link href={redirect ? `/registro?redirect=${redirect}` : '/registro'}
+            ¿Aún no estás registrado?{' '}
+            <Link href={`/registro${redirect ? `?redirect=${redirect}` : ''}`}
               style={{ color: '#0ea5e9', fontWeight: 700, textDecoration: 'none' }}>
-              Registrarse gratis
+              Regístrate
             </Link>
           </p>
-        </form>
+
+        </div>
       </div>
+
+      {/* FOTO — Derecha */}
+      <div style={{ flex: 1, position: 'relative', display: 'none' }} className="lg-block">
+        <img
+          src="https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=800&h=1000&fit=crop"
+          alt="Corredor"
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.1) 60%, transparent 100%)', display: 'flex', alignItems: 'flex-end', padding: '48px' }}>
+          <p style={{ color: 'white', fontSize: '30px', fontWeight: 800, lineHeight: 1.3 }}>
+            ¡Di Patata! 📸<br />
+            <span style={{ color: '#38bdf8' }}>Sonríele a las nuevas experiencias</span>
+          </p>
+        </div>
+      </div>
+
+      {/* Fix para mostrar la foto en pantallas grandes */}
+      <style>{`
+        @media (min-width: 1024px) {
+          .lg-block { display: block !important; }
+        }
+      `}</style>
+
     </div>
   );
 }

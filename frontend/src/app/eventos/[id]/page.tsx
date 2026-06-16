@@ -1,10 +1,11 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ShoppingCart, Lock, X, CheckCircle, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import { agregarFoto, estaEnCarrito, contarItems } from '@/lib/carrito';
 
 interface Evento {
   id: string;
@@ -31,22 +32,23 @@ export default function EventoPage() {
   const [fotos, setFotos] = useState<Foto[]>([]);
   const [misFotos, setMisFotos] = useState<Foto[]>([]);
   const [cargando, setCargando] = useState(true);
-  const [buscando, setBuscando] = useState(false);
   const [mostrarMisFotos, setMostrarMisFotos] = useState(false);
   const [fotoAmpliada, setFotoAmpliada] = useState<Foto | null>(null);
   const [logueado, setLogueado] = useState(false);
+  const [itemsCarrito, setItemsCarrito] = useState(0);
 
-  // Estados cámara
+  // Cámara
   const [mostrarCamara, setMostrarCamara] = useState(false);
   const [fotoCapturada, setFotoCapturada] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
+  const [canvasRef, setCanvasRef] = useState<HTMLCanvasElement | null>(null);
+  const [streamRef, setStreamRef] = useState<MediaStream | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     setLogueado(!!token);
+    setItemsCarrito(contarItems());
   }, []);
 
   useEffect(() => {
@@ -67,7 +69,6 @@ export default function EventoPage() {
     cargar();
   }, [id]);
 
-  // Abrir cámara
   const abrirCamara = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -80,10 +81,10 @@ export default function EventoPage() {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: 640, height: 480 }
       });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+      setStreamRef(stream);
+      if (videoRef) {
+        videoRef.srcObject = stream;
+        videoRef.play();
       }
     } catch {
       toast.error('No se pudo acceder a la cámara');
@@ -91,52 +92,35 @@ export default function EventoPage() {
     }
   };
 
-  // Tomar foto
   const tomarFoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
+    if (!videoRef || !canvasRef) return;
+    canvasRef.width = videoRef.videoWidth;
+    canvasRef.height = videoRef.videoHeight;
+    const ctx = canvasRef.getContext('2d');
     if (!ctx) return;
-    ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-    setFotoCapturada(dataUrl);
-    // Parar stream
-    streamRef.current?.getTracks().forEach(t => t.stop());
+    ctx.drawImage(videoRef, 0, 0);
+    setFotoCapturada(canvasRef.toDataURL('image/jpeg', 0.8));
+    streamRef?.getTracks().forEach(t => t.stop());
   };
 
-  // Reintentar
   const reintentar = async () => {
     setFotoCapturada(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: 640, height: 480 }
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-    } catch {
-      toast.error('No se pudo acceder a la cámara');
-    }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      setStreamRef(stream);
+      if (videoRef) { videoRef.srcObject = stream; videoRef.play(); }
+    } catch { toast.error('Error al acceder a la cámara'); }
   };
 
-  // Cerrar cámara
   const cerrarCamara = () => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef?.getTracks().forEach(t => t.stop());
     setMostrarCamara(false);
     setFotoCapturada(null);
   };
 
-  // Buscar con selfie
   const buscarConSelfie = async () => {
-    if (!fotoCapturada) return;
     setProcesando(true);
     try {
-      // Por ahora busca las fotos del usuario en el evento
       const { data } = await api.get(`/fotos/mis-fotos?event_id=${id}`);
       setMisFotos(data.datos);
       setMostrarMisFotos(true);
@@ -153,9 +137,31 @@ export default function EventoPage() {
     }
   };
 
+  const manejarAdquirir = (foto: Foto, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!logueado) {
+      router.push(`/registro?redirect=/eventos/${id}`);
+      return;
+    }
+    if (estaEnCarrito(foto.id)) {
+      router.push('/carrito');
+      return;
+    }
+    if (evento) {
+      agregarFoto({
+        foto_id: foto.id,
+        event_id: id,
+        event_nombre: evento.nombre,
+        foto_url: foto.gcs_watermark_url || foto.gcs_original_url,
+      });
+      setItemsCarrito(contarItems());
+      toast.success('¡Foto agregada al carrito!');
+    }
+  };
+
   if (cargando) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'white' }}>
         <p style={{ color: '#64748b' }}>Cargando...</p>
       </div>
     );
@@ -180,15 +186,21 @@ export default function EventoPage() {
     <div style={{ minHeight: '100vh', backgroundColor: 'white', fontFamily: 'sans-serif' }}>
 
       {/* NAVBAR */}
-      <nav style={{ backgroundColor: 'white', borderBottom: '1px solid #e2e8f0', padding: '0 24px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <nav style={{ backgroundColor: 'white', borderBottom: '1px solid #e2e8f0', padding: '0 24px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 40, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-          <div style={{ width: '32px', height: '32px', backgroundColor: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src="/Logo.png" alt="FR" style={{ width: '28px', height: '28px', objectFit: 'contain' }}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          </div>
+          <img src="/Logo.png" alt="FR" style={{ width: '32px', height: '32px', objectFit: 'contain' }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           <span style={{ fontWeight: 800, fontSize: '18px', color: '#0f172a', letterSpacing: '1px' }}>FOTORUNNER</span>
         </Link>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {itemsCarrito > 0 && (
+            <Link href="/carrito" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#f1f5f9', color: '#0f172a', fontSize: '14px', fontWeight: 700, padding: '8px 14px', borderRadius: '10px', textDecoration: 'none', border: '1px solid #e2e8f0' }}>
+              <ShoppingCart size={16} />
+              <span style={{ position: 'absolute', top: '-6px', right: '-6px', width: '18px', height: '18px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '50%', color: 'white', fontSize: '10px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {itemsCarrito}
+              </span>
+            </Link>
+          )}
           {logueado ? (
             <Link href="/perfil" style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', fontSize: '14px', fontWeight: 700, padding: '8px 18px', borderRadius: '10px', textDecoration: 'none' }}>
               Mi perfil
@@ -211,24 +223,13 @@ export default function EventoPage() {
         <img src={fondoHero} alt="evento"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.3)' }} />
-
-        <div style={{
-          position: 'absolute', left: '50%', top: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 10, width: '380px',
-          backgroundColor: 'white', borderRadius: '20px',
-          padding: '36px 32px', textAlign: 'center',
-          boxShadow: '0 8px 40px rgba(0,0,0,0.25)'
-        }}>
+        <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, width: '380px', backgroundColor: 'white', borderRadius: '20px', padding: '36px 32px', textAlign: 'center', boxShadow: '0 8px 40px rgba(0,0,0,0.25)' }}>
           <h2 style={{ fontSize: '22px', fontWeight: 900, color: '#0f172a', marginBottom: '8px' }}>
             Encuentra tus imágenes
           </h2>
           <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '24px', lineHeight: 1.5 }}>
-            {logueado
-              ? 'Tómate una foto con tu cámara para encontrar tus imágenes'
-              : 'Crea tu cuenta para buscar tus fotos automáticamente'}
+            {logueado ? 'Tómate una foto para encontrar tus imágenes' : 'Crea tu cuenta para buscar tus fotos automáticamente'}
           </p>
-
           <div style={{ margin: '0 auto 24px', width: '72px', height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
               <path d="M8 20 L8 8 L20 8" stroke="#cbd5e1" strokeWidth="2.5" strokeLinecap="round"/>
@@ -241,24 +242,14 @@ export default function EventoPage() {
               <path d="M29 48 Q36 52 43 48" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" fill="none"/>
             </svg>
           </div>
-
           <button onClick={abrirCamara}
-            style={{
-              width: '100%',
-              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-              color: 'white', border: 'none', padding: '15px',
-              borderRadius: '14px', fontWeight: 700, fontSize: '15px',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              marginBottom: logueado ? '0' : '12px'
-            }}>
+            style={{ width: '100%', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: 'white', border: 'none', padding: '15px', borderRadius: '14px', fontWeight: 700, fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: logueado ? '0' : '12px' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
               <circle cx="12" cy="13" r="4"/>
             </svg>
-            {logueado ? 'Hacer selfie' : 'Buscar mis fotos'}
+            {logueado ? 'Buscar mis fotos' : 'Hacer selfie'}
           </button>
-
           {!logueado && (
             <Link href={`/login?redirect=/eventos/${id}`}
               style={{ color: '#94a3b8', fontSize: '12px', textDecoration: 'none', display: 'block', marginTop: '4px' }}>
@@ -272,23 +263,18 @@ export default function EventoPage() {
       {mostrarCamara && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div style={{ backgroundColor: 'white', borderRadius: '24px', overflow: 'hidden', width: '100%', maxWidth: '820px', display: 'flex', position: 'relative' }}>
-
-            {/* Botón cerrar */}
             <button onClick={cerrarCamara}
               style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 10, width: '32px', height: '32px', backgroundColor: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', color: 'white', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               ✕
             </button>
-
-            {/* Video o foto capturada */}
             <div style={{ flex: 1, backgroundColor: '#000', position: 'relative', minHeight: '380px' }}>
               {!fotoCapturada ? (
                 <>
-                  <video ref={videoRef} autoPlay playsInline muted
+                  <video ref={(el) => setVideoRef(el)} autoPlay playsInline muted
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  {/* Botón capturar */}
-                  <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '16px', alignItems: 'center' }}>
+                  <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)' }}>
                     <button onClick={tomarFoto}
-                      style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'white', border: '3px solid rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
+                      style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'white', border: '3px solid rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -300,19 +286,15 @@ export default function EventoPage() {
                 </>
               ) : (
                 <>
-                  <img src={fotoCapturada} alt="Selfie"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  {/* Botón reintentar */}
+                  <img src={fotoCapturada} alt="Selfie" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                   <button onClick={reintentar}
                     style={{ position: 'absolute', bottom: '20px', right: '20px', backgroundColor: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: '44px', height: '44px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <RotateCcw size={20} />
                   </button>
                 </>
               )}
-              <canvas ref={canvasRef} style={{ display: 'none' }} />
+              <canvas ref={(el) => setCanvasRef(el)} style={{ display: 'none' }} />
             </div>
-
-            {/* Panel derecho */}
             <div style={{ width: '280px', padding: '32px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '20px' }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '48px', marginBottom: '12px' }}>📸</div>
@@ -320,23 +302,14 @@ export default function EventoPage() {
                   {!fotoCapturada ? 'Tómate una selfie' : '¿Todo bien?'}
                 </p>
                 <p style={{ color: '#64748b', fontSize: '13px', lineHeight: 1.5 }}>
-                  {!fotoCapturada
-                    ? 'Recuerda incluir a todas las personas que te acompañaron ese día'
-                    : 'Usaremos esta foto para encontrar tus imágenes en el evento'}
+                  {!fotoCapturada ? 'Incluye a todas las personas que te acompañaron' : 'Usaremos esta foto para encontrar tus imágenes'}
                 </p>
               </div>
-
               {fotoCapturada && (
                 <button onClick={buscarConSelfie} disabled={procesando}
                   style={{ width: '100%', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 700, fontSize: '14px', cursor: procesando ? 'not-allowed' : 'pointer', opacity: procesando ? 0.7 : 1 }}>
                   {procesando ? 'Buscando...' : 'Buscar mis fotos'}
                 </button>
-              )}
-
-              {!fotoCapturada && (
-                <p style={{ color: '#94a3b8', fontSize: '12px', textAlign: 'center', lineHeight: 1.5 }}>
-                  Haz clic en el botón de cámara para capturar tu selfie
-                </p>
               )}
             </div>
           </div>
@@ -360,16 +333,14 @@ export default function EventoPage() {
               </button>
             </div>
             {misFotos.length === 0 ? (
-              <p style={{ color: '#64748b', fontSize: '14px' }}>
-                El fotógrafo aún no procesó las fotos o no apareces en ninguna. Vuelve más tarde.
-              </p>
+              <p style={{ color: '#64748b', fontSize: '14px' }}>El fotógrafo aún no procesó las fotos. Vuelve más tarde.</p>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
                 {misFotos.map((foto) => (
                   <div key={foto.id} onClick={() => setFotoAmpliada(foto)}
                     style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', aspectRatio: '3/2', cursor: 'pointer', border: '2px solid #16a34a' }}>
-                    <img src={foto.gcs_watermark_url || foto.gcs_original_url}
-                      alt="Mi foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={foto.gcs_watermark_url || foto.gcs_original_url} alt="Mi foto"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     <div style={{ position: 'absolute', bottom: '6px', right: '6px', backgroundColor: '#16a34a', color: 'white', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px' }}>
                       Tu foto
                     </div>
@@ -398,30 +369,35 @@ export default function EventoPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px', marginBottom: '40px' }}>
               {fotos.map((foto) => (
                 <div key={foto.id} onClick={() => setFotoAmpliada(foto)}
-                  style={{ position: 'relative', borderRadius: '14px', overflow: 'hidden', aspectRatio: '3/2', cursor: 'pointer', backgroundColor: '#f1f5f9' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; }}>
-                  <img src={foto.gcs_watermark_url || foto.gcs_original_url} alt="Foto"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0)', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLDivElement).style.backgroundColor = 'rgba(0,0,0,0.45)';
-                      const btn = e.currentTarget.querySelector('button') as HTMLButtonElement;
-                      if (btn) btn.style.opacity = '1';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLDivElement).style.backgroundColor = 'rgba(0,0,0,0)';
-                      const btn = e.currentTarget.querySelector('button') as HTMLButtonElement;
-                      if (btn) btn.style.opacity = '0';
-                    }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!logueado) router.push(`/registro?redirect=/eventos/${id}`);
-                        else toast('Módulo de pagos próximamente');
-                      }}
+                  style={{ position: 'relative', borderRadius: '14px', overflow: 'hidden', aspectRatio: '3/2', cursor: 'pointer', backgroundColor: '#f1f5f9', border: estaEnCarrito(foto.id) ? '2px solid #0ea5e9' : '2px solid transparent' }}
+                  onMouseEnter={(e) => {
+                    const overlay = (e.currentTarget as HTMLDivElement).querySelector('.hover-overlay') as HTMLDivElement;
+                    const btn = (e.currentTarget as HTMLDivElement).querySelector('.adquirir-btn') as HTMLButtonElement;
+                    if (overlay) overlay.style.backgroundColor = 'rgba(0,0,0,0.45)';
+                    if (btn) btn.style.opacity = '1';
+                  }}
+                  onMouseLeave={(e) => {
+                    const overlay = (e.currentTarget as HTMLDivElement).querySelector('.hover-overlay') as HTMLDivElement;
+                    const btn = (e.currentTarget as HTMLDivElement).querySelector('.adquirir-btn') as HTMLButtonElement;
+                    if (overlay) overlay.style.backgroundColor = 'rgba(0,0,0,0)';
+                    if (btn) btn.style.opacity = '0';
+                  }}>
+                  <img
+                    src={foto.gcs_watermark_url || foto.gcs_original_url}
+                    alt="Foto"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    crossOrigin="anonymous"
+                  />
+                  {estaEnCarrito(foto.id) && (
+                    <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: '#0ea5e9', color: 'white', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <ShoppingCart size={10} /> En carrito
+                    </div>
+                  )}
+                  <div className="hover-overlay" style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0)', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <button className="adquirir-btn" onClick={(e) => manejarAdquirir(foto, e)}
                       style={{ background: 'white', border: 'none', borderRadius: '50px', padding: '8px 16px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: 0, transition: 'opacity 0.2s', color: '#0f172a' }}>
-                      <ShoppingCart size={13} /> Adquirir
+                      <ShoppingCart size={13} />
+                      {estaEnCarrito(foto.id) ? 'Ver carrito' : 'Adquirir'}
                     </button>
                   </div>
                   <div style={{ position: 'absolute', bottom: '8px', left: '8px', backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', fontSize: '10px', fontWeight: 600, padding: '3px 8px', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -431,6 +407,7 @@ export default function EventoPage() {
               ))}
             </div>
 
+            {/* Banner CTA */}
             <div style={{ background: 'linear-gradient(135deg, #020617, #0f172a, #1e1b4b)', borderRadius: '20px', padding: '36px 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '24px', flexWrap: 'wrap', border: '1px solid rgba(99,102,241,0.2)' }}>
               <div>
                 <h3 style={{ color: 'white', fontSize: '20px', fontWeight: 800, marginBottom: '6px' }}>¿Apareces en estas fotos?</h3>
@@ -439,16 +416,15 @@ export default function EventoPage() {
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <button onClick={abrirCamara}
-                  style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', padding: '12px 24px', borderRadius: '12px', border: 'none', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}>
-                  {logueado ? 'Hacer selfie' : 'Registrarme gratis'}
-                </button>
-                {!logueado && (
-                  <Link href={`/login?redirect=/eventos/${id}`}
-                    style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', padding: '12px 24px', borderRadius: '12px', textDecoration: 'none', fontWeight: 700, fontSize: '14px', border: '1px solid rgba(255,255,255,0.15)' }}>
-                    Ya tengo cuenta
+                {itemsCarrito > 0 && (
+                  <Link href="/carrito" style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', padding: '12px 24px', borderRadius: '12px', textDecoration: 'none', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ShoppingCart size={16} /> Ver carrito ({itemsCarrito})
                   </Link>
                 )}
+                <button onClick={abrirCamara}
+                  style={{ background: itemsCarrito > 0 ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', padding: '12px 24px', borderRadius: '12px', border: itemsCarrito > 0 ? '1px solid rgba(255,255,255,0.15)' : 'none', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}>
+                  {logueado ? 'Buscar mis fotos' : 'Registrarme gratis'}
+                </button>
               </div>
             </div>
           </>
@@ -467,13 +443,10 @@ export default function EventoPage() {
               ✕
             </button>
             <div style={{ marginTop: '16px', textAlign: 'center' }}>
-              <button
-                onClick={() => {
-                  if (!logueado) router.push(`/registro?redirect=/eventos/${id}`);
-                  else toast('Módulo de pagos próximamente');
-                }}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', padding: '12px 28px', borderRadius: '12px', border: 'none', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}>
-                <ShoppingCart size={16} /> Adquirir esta foto
+              <button onClick={(e) => manejarAdquirir(fotoAmpliada, e)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: estaEnCarrito(fotoAmpliada.id) ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', padding: '12px 28px', borderRadius: '12px', border: estaEnCarrito(fotoAmpliada.id) ? '1px solid rgba(255,255,255,0.2)' : 'none', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}>
+                <ShoppingCart size={16} />
+                {estaEnCarrito(fotoAmpliada.id) ? 'Ver carrito' : 'Adquirir esta foto'}
               </button>
             </div>
           </div>

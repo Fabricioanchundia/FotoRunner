@@ -10,12 +10,15 @@ datasource db {
 enum Role {
   USER
   ADMIN
+  HELPER
 }
 
 enum EventoTipo {
   RUNNING
   ATLETISMO
   CICLISMO
+  TRIATHLON
+  TRAIL
 }
 
 enum EventoStatus {
@@ -51,18 +54,20 @@ enum NotificationStatus {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  nombre         String
-  email          String    @unique
-  phone          String?
-  password       String
-  role           Role      @default(USER)
-  face_vector    String?
-  avatar_url     String?
-  email_verified Boolean   @default(false)
-  phone_verified Boolean   @default(false)
-  created_at     DateTime  @default(now())
-  updated_at     DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  nombre             String
+  email              String    @unique
+  phone              String?
+  password           String
+  role               Role      @default(USER)
+  face_vector        String?
+  avatar_url         String?
+  email_verified     Boolean   @default(false)
+  phone_verified     Boolean   @default(false)
+  helper_expires_at  DateTime?
+  helper_permissions Json?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
 
   eventos        Event[]
   ordenes        Order[]
@@ -73,21 +78,23 @@ model User {
 }
 
 model Event {
-  id          String       @id @default(cuid())
-  nombre      String
-  descripcion String?
-  fecha       DateTime
-  ciudad      String
-  tipo        EventoTipo
-  cover_url   String?
-  status      EventoStatus @default(PROXIMO)
-  admin_id    String
-  created_at  DateTime     @default(now())
+  id                String       @id @default(cuid())
+  nombre            String
+  descripcion       String?
+  fecha             DateTime
+  ciudad            String
+  tipo              EventoTipo
+  cover_url         String?
+  status            EventoStatus @default(PROXIMO)
+  precio_individual Float        @default(5.99)
+  precio_photopass  Float        @default(11.99)
+  admin_id          String
+  created_at        DateTime     @default(now())
 
-  admin       User         @relation(fields: [admin_id], references: [id])
-  fotos       Photo[]
-  packages    Package[]
-  ordenes     Order[]
+  admin    User      @relation(fields: [admin_id], references: [id])
+  fotos    Photo[]
+  packages Package[]
+  ordenes  Order[]
 
   @@map("events")
 }
@@ -100,7 +107,7 @@ model Photo {
   processed_at      DateTime?
   created_at        DateTime  @default(now())
 
-  evento       Event       @relation(fields: [event_id], references: [id])
+  evento       Event        @relation(fields: [event_id], references: [id])
   face_matches FaceMatch[]
   order_photos OrderPhoto[]
 
@@ -114,8 +121,8 @@ model FaceMatch {
   confidence_score Float
   created_at       DateTime @default(now())
 
-  foto  Photo @relation(fields: [photo_id], references: [id])
-  user  User  @relation(fields: [user_id], references: [id])
+  foto Photo @relation(fields: [photo_id], references: [id])
+  user User  @relation(fields: [user_id], references: [id])
 
   @@map("face_matches")
 }
@@ -145,10 +152,10 @@ model Order {
   paid_at        DateTime?
   created_at     DateTime      @default(now())
 
-  user     User         @relation(fields: [user_id], references: [id])
-  evento   Event        @relation(fields: [event_id], references: [id])
-  package  Package?     @relation(fields: [package_id], references: [id])
-  fotos    OrderPhoto[]
+  user    User         @relation(fields: [user_id], references: [id])
+  evento  Event        @relation(fields: [event_id], references: [id])
+  package Package?     @relation(fields: [package_id], references: [id])
+  fotos   OrderPhoto[]
 
   @@map("orders")
 }
@@ -165,13 +172,13 @@ model OrderPhoto {
 }
 
 model Notification {
-  id      String              @id @default(cuid())
-  user_id String
-  type    NotificationType
-  channel NotificationChannel
-  status  NotificationStatus
-  sent_at DateTime?
-  created_at DateTime         @default(now())
+  id         String              @id @default(cuid())
+  user_id    String
+  type       NotificationType
+  channel    NotificationChannel
+  status     NotificationStatus
+  sent_at    DateTime?
+  created_at DateTime            @default(now())
 
   user User @relation(fields: [user_id], references: [id])
 

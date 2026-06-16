@@ -6,11 +6,12 @@ import logger from '../utils/logger';
 import { RequestAutenticado } from '../middlewares/auth.middleware';
 
 const prisma = new PrismaClient();
+const MS_FACIAL_URL = process.env['MS_FACIAL_URL'] || 'http://localhost:3002';
 
 const schemaActualizar = z.object({
   nombre: z.string().min(2).optional(),
   phone: z.string().optional(),
-  avatar_url: z.string().url().optional()
+  avatar_url: z.string().optional()
 });
 
 export const obtenerUsuario = async (
@@ -23,15 +24,9 @@ export const obtenerUsuario = async (
     const usuario = await prisma.user.findUnique({
       where: { id },
       select: {
-        id: true,
-        nombre: true,
-        email: true,
-        phone: true,
-        role: true,
-        avatar_url: true,
-        email_verified: true,
-        phone_verified: true,
-        created_at: true
+        id: true, nombre: true, email: true, phone: true,
+        role: true, avatar_url: true, email_verified: true,
+        phone_verified: true, created_at: true
       }
     });
 
@@ -69,14 +64,27 @@ export const actualizarUsuario = async (
       where: { id },
       data: datos.data,
       select: {
-        id: true,
-        nombre: true,
-        email: true,
-        phone: true,
-        avatar_url: true,
-        updated_at: true
+        id: true, nombre: true, email: true, phone: true,
+        avatar_url: true, updated_at: true
       }
     });
+
+    // Si actualizó el avatar, registrar vector facial en ms-facial
+    if (datos.data.avatar_url) {
+      try {
+        await fetch(`${MS_FACIAL_URL}/api/facial/registrar-vector`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: id,
+            avatar_url: datos.data.avatar_url
+          })
+        });
+        logger.info(`Vector facial registrado para usuario ${id}`);
+      } catch (err) {
+        logger.warn(`MS-Facial no disponible al registrar vector: ${err}`);
+      }
+    }
 
     logger.info(`Usuario actualizado: ${id}`);
     responderExito(res, usuario, 'Usuario actualizado exitosamente');

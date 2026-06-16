@@ -2,10 +2,14 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Calendar, MapPin, Image, LogOut, LayoutDashboard, Camera, Users, Settings, Filter, Search } from 'lucide-react';
+import {
+  Plus, Calendar, MapPin, Image, Upload,
+  LayoutDashboard, Camera, Users,
+  Filter, Search, DollarSign, TrendingUp, Eye, X
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
-import { cerrarSesion } from '@/lib/auth';
+import AdminSidebar from '@/components/AdminSidebar';
 
 interface Evento {
   id: string;
@@ -15,37 +19,63 @@ interface Evento {
   tipo: string;
   status: string;
   cover_url: string | null;
+  precio_individual: number;
+  precio_photopass: number;
   _count: { fotos: number };
+}
+
+interface Stats {
+  totalUsuarios: number;
+  totalEventos: number;
+  totalFotos: number;
+  totalOrdenes: number;
+  ingresoTotal: number;
 }
 
 export default function AdminPage() {
   const router = useRouter();
   const [eventos, setEventos] = useState<Evento[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [cargando, setCargando] = useState(true);
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('TODOS');
+
+  // Modal crear evento
   const [mostrarForm, setMostrarForm] = useState(false);
   const [creando, setCreando] = useState(false);
-  const [busqueda, setBusqueda] = useState('');
-  const [filtroTipo, setFiltroTipo] = useState('TODOS');
-  const [filtroStatus, setFiltroStatus] = useState('TODOS');
   const [form, setForm] = useState({
-    nombre: '', ciudad: '', fecha: '',
-    tipo: 'RUNNING', descripcion: '', cover_url: ''
+    nombre: '', ciudad: '', fecha: '', tipo: 'RUNNING',
+    descripcion: '', cover_url: '',
+    precio_individual: '5.99', precio_photopass: '11.99'
   });
 
-  // Estados para subir fotos
-  const [eventoSeleccionado, setEventoSeleccionado] = useState<string | null>(null);
-  const [mostrarFormFoto, setMostrarFormFoto] = useState(false);
+  // Modal subir foto
+  const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(null);
+  const [mostrarSubirFoto, setMostrarSubirFoto] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
-  const [formFoto, setFormFoto] = useState({ gcs_original_url: '', gcs_watermark_url: '' });
   const [archivoFoto, setArchivoFoto] = useState<File | null>(null);
-  const [previewFoto, setPreviewFoto] = useState<string>('');
+  const [previewFoto, setPreviewFoto] = useState('');
+  const [urlFoto, setUrlFoto] = useState('');
+  const [urlWatermark, setUrlWatermark] = useState('');
+  const [fotosSubidas, setFotosSubidas] = useState(0);
 
-  useEffect(() => { cargarEventos(); }, []);
+  // Modal precios
+  const [mostrarPrecios, setMostrarPrecios] = useState(false);
+  const [eventoPrecios, setEventoPrecios] = useState<Evento | null>(null);
+  const [precioInd, setPrecioInd] = useState('');
+  const [precioPass, setPrecioPass] = useState('');
+  const [guardandoPrecios, setGuardandoPrecios] = useState(false);
 
-  const cargarEventos = async () => {
+  useEffect(() => { cargarTodo(); }, []);
+
+  const cargarTodo = async () => {
     try {
-      const { data } = await api.get('/eventos');
-      setEventos(data.datos);
+      const [{ data: dataEventos }, { data: dataStats }] = await Promise.all([
+        api.get('/eventos'),
+        api.get('/admin/stats')
+      ]);
+      setEventos(dataEventos.datos);
+      setStats(dataStats.datos);
     } catch {
       router.push('/login');
     } finally {
@@ -57,11 +87,16 @@ export default function AdminPage() {
     e.preventDefault();
     setCreando(true);
     try {
-      await api.post('/eventos', { ...form, fecha: new Date(form.fecha).toISOString() });
+      await api.post('/eventos', {
+        ...form,
+        fecha: new Date(form.fecha).toISOString(),
+        precio_individual: Number(form.precio_individual),
+        precio_photopass: Number(form.precio_photopass)
+      });
       toast.success('Evento creado exitosamente');
       setMostrarForm(false);
-      setForm({ nombre: '', ciudad: '', fecha: '', tipo: 'RUNNING', descripcion: '', cover_url: '' });
-      cargarEventos();
+      setForm({ nombre: '', ciudad: '', fecha: '', tipo: 'RUNNING', descripcion: '', cover_url: '', precio_individual: '5.99', precio_photopass: '11.99' });
+      cargarTodo();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { mensaje?: string } } };
       toast.error(error.response?.data?.mensaje || 'Error al crear evento');
@@ -70,12 +105,22 @@ export default function AdminPage() {
     }
   };
 
+  const manejarArchivo = (file: File) => {
+    if (!file.type.startsWith('image/')) { toast.error('Solo imágenes'); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Máximo 10MB'); return; }
+    setArchivoFoto(file);
+    setPreviewFoto(URL.createObjectURL(file));
+    setUrlFoto('');
+    setUrlWatermark('');
+  };
+
   const subirFoto = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventoSeleccionado) return;
     setSubiendoFoto(true);
     try {
-      let urlFoto = formFoto.gcs_original_url;
+      let urlFinal = urlFoto;
+      let urlWatermarkFinal = urlWatermark;
 
       if (archivoFoto) {
         const formData = new FormData();
@@ -88,27 +133,25 @@ export default function AdminPage() {
         });
         const data = await res.json();
         if (!data.exito) throw new Error(data.mensaje);
-        urlFoto = data.datos.url;
+        urlFinal = data.datos.url;
+        urlWatermarkFinal = data.datos.url_watermark;
       }
 
-      if (!urlFoto) {
-        toast.error('Selecciona una foto o ingresa una URL');
-        setSubiendoFoto(false);
-        return;
-      }
+      if (!urlFinal) { toast.error('Selecciona foto o URL'); setSubiendoFoto(false); return; }
 
       await api.post('/fotos', {
-        event_id: eventoSeleccionado,
-        gcs_original_url: urlFoto,
-        ...(formFoto.gcs_watermark_url && { gcs_watermark_url: formFoto.gcs_watermark_url })
+        event_id: eventoSeleccionado.id,
+        gcs_original_url: urlFinal,
+        ...(urlWatermarkFinal && { gcs_watermark_url: urlWatermarkFinal })
       });
 
-      toast.success('¡Foto agregada exitosamente!');
-      setMostrarFormFoto(false);
-      setFormFoto({ gcs_original_url: '', gcs_watermark_url: '' });
+      setFotosSubidas(prev => prev + 1);
       setArchivoFoto(null);
       setPreviewFoto('');
-      cargarEventos();
+      setUrlFoto('');
+      setUrlWatermark('');
+      toast.success('¡Foto subida con marca de agua!');
+      cargarTodo();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { mensaje?: string } } };
       toast.error(error.response?.data?.mensaje || 'Error al subir foto');
@@ -117,197 +160,206 @@ export default function AdminPage() {
     }
   };
 
-  const manejarArchivo = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      toast.error('Solo se permiten imágenes');
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('La imagen no puede superar 10MB');
-      return;
-    }
-    setArchivoFoto(file);
-    setPreviewFoto(URL.createObjectURL(file));
-    setFormFoto({ ...formFoto, gcs_original_url: '' });
+  const guardarPrecios = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eventoPrecios) return;
+    setGuardandoPrecios(true);
+    try {
+      await api.patch(`/admin/eventos/${eventoPrecios.id}/precios`, {
+        precio_individual: Number(precioInd),
+        precio_photopass: Number(precioPass)
+      });
+      toast.success('Precios actualizados');
+      setMostrarPrecios(false);
+      cargarTodo();
+    } catch { toast.error('Error al actualizar precios'); }
+    finally { setGuardandoPrecios(false); }
+  };
+
+  const abrirPrecios = (evento: Evento) => {
+    setEventoPrecios(evento);
+    setPrecioInd(String(evento.precio_individual || 5.99));
+    setPrecioPass(String(evento.precio_photopass || 11.99));
+    setMostrarPrecios(true);
+  };
+
+  const cambiarStatus = async (eventoId: string, status: string) => {
+    try {
+      await api.patch(`/admin/eventos/${eventoId}/status`, { status });
+      setEventos(prev => prev.map(e => e.id === eventoId ? { ...e, status } : e));
+      toast.success('Estado actualizado');
+    } catch { toast.error('Error al cambiar estado'); }
+  };
+
+  const cerrarModalFoto = () => {
+    setMostrarSubirFoto(false);
+    setArchivoFoto(null);
+    setPreviewFoto('');
+    setUrlFoto('');
+    setUrlWatermark('');
   };
 
   const eventosFiltrados = eventos.filter(e => {
     const matchBusqueda = e.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       e.ciudad.toLowerCase().includes(busqueda.toLowerCase());
-    const matchTipo = filtroTipo === 'TODOS' || e.tipo === filtroTipo;
     const matchStatus = filtroStatus === 'TODOS' || e.status === filtroStatus;
-    return matchBusqueda && matchTipo && matchStatus;
+    return matchBusqueda && matchStatus;
   });
 
-  const colorStatus = (status: string) => {
-    if (status === 'ACTIVO') return { backgroundColor: '#22c55e', color: 'white' };
-    if (status === 'PROXIMO') return { backgroundColor: '#3b82f6', color: 'white' };
-    return { backgroundColor: '#6b7280', color: 'white' };
-  };
-
-  const cerrarModalFoto = () => {
-    setMostrarFormFoto(false);
-    setFormFoto({ gcs_original_url: '', gcs_watermark_url: '' });
-    setArchivoFoto(null);
-    setPreviewFoto('');
+  const colorStatus = (s: string) => {
+    if (s === 'ACTIVO') return { bg: '#dcfce7', color: '#16a34a' };
+    if (s === 'PROXIMO') return { bg: '#dbeafe', color: '#2563eb' };
+    return { bg: '#f1f5f9', color: '#64748b' };
   };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#0f172a' }}>
+      <AdminSidebar />
 
-      {/* SIDEBAR */}
-      <div style={{ width: '240px', backgroundColor: '#1e293b', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-            <img src="/Logo.png" alt="FR" style={{ width: '32px', height: '32px', objectFit: 'contain' }}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-            <span style={{ fontWeight: 800, fontSize: '16px', color: 'white', letterSpacing: '2px' }}>FOTORUNNER</span>
-          </Link>
-        </div>
-
-        <nav style={{ padding: '16px 12px', flex: 1 }}>
-          {[
-            { icon: <LayoutDashboard size={18} />, label: 'Mis galerías', href: '/admin', active: true },
-            { icon: <Camera size={18} />, label: 'Fotos', href: '/admin/fotos', active: false },
-            { icon: <Users size={18} />, label: 'Usuarios registrados', href: '/admin/usuarios', active: false },
-            { icon: <Filter size={18} />, label: 'Facial cloud', href: '/admin/facial', active: false },
-            { icon: <Image size={18} />, label: 'Mi monitor', href: '/admin/monitor', active: false },
-            { icon: <Settings size={18} />, label: 'Configuración', href: '/admin/configuracion', active: false },
-          ].map((item) => (
-            <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                padding: '10px 12px', borderRadius: '10px',
-                backgroundColor: item.active ? '#FF6B00' : 'transparent',
-                color: item.active ? 'white' : 'rgba(255,255,255,0.5)',
-                fontSize: '14px', fontWeight: item.active ? 700 : 500,
-                marginBottom: '4px', cursor: 'pointer',
-              }}>
-                {item.icon} {item.label}
-              </div>
-            </Link>
-          ))}
-        </nav>
-
-        <div style={{ padding: '16px 12px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <button onClick={cerrarSesion}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: '14px', fontWeight: 500 }}>
-            <LogOut size={18} /> Cerrar sesión
-          </button>
-        </div>
-      </div>
-
-      {/* CONTENIDO PRINCIPAL */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* TOPBAR */}
-        <div style={{ backgroundColor: '#1e293b', padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ backgroundColor: '#1e293b', padding: '16px 28px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginBottom: '2px' }}>Panel admin</p>
-            <h1 style={{ color: 'white', fontSize: '18px', fontWeight: 800 }}>Mis galerías</h1>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginBottom: '2px' }}>Panel administrador</p>
+            <h1 style={{ color: 'white', fontSize: '20px', fontWeight: 800 }}>Mis galerías</h1>
           </div>
           <button onClick={() => setMostrarForm(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#FF6B00', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
             <Plus size={16} /> Crear galería
           </button>
         </div>
 
-        {/* FILTROS */}
-        <div style={{ backgroundColor: '#1e293b', padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Filter size={14} /> Filtros
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '8px', padding: '8px 12px' }}>
-            <Search size={14} color="rgba(255,255,255,0.4)" />
-            <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Nombre de la galería..."
-              style={{ background: 'none', border: 'none', outline: 'none', color: 'white', fontSize: '13px', width: '180px' }} />
+        {/* STATS */}
+        {stats && (
+          <div style={{ backgroundColor: '#1e293b', padding: '12px 28px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {[
+              { label: 'Eventos', valor: stats.totalEventos, icon: <Calendar size={13} />, color: '#0ea5e9' },
+              { label: 'Fotos', valor: stats.totalFotos, icon: <Camera size={13} />, color: '#a78bfa' },
+              { label: 'Usuarios', valor: stats.totalUsuarios, icon: <Users size={13} />, color: '#34d399' },
+              { label: 'Ventas', valor: stats.totalOrdenes, icon: <TrendingUp size={13} />, color: '#fb923c' },
+              { label: 'Ingresos', valor: `$${Number(stats.ingresoTotal).toFixed(2)}`, icon: <DollarSign size={13} />, color: '#facc15' },
+            ].map((s) => (
+              <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: '10px', padding: '8px 14px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ color: s.color }}>{s.icon}</span>
+                <div>
+                  <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '10px', marginBottom: '1px' }}>{s.label}</p>
+                  <p style={{ color: 'white', fontSize: '15px', fontWeight: 800 }}>{s.valor}</p>
+                </div>
+              </div>
+            ))}
           </div>
-          <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}
-            style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', padding: '8px 12px', color: 'rgba(255,255,255,0.7)', fontSize: '13px', cursor: 'pointer' }}>
-            <option value="TODOS">Todos los tipos</option>
-            <option value="RUNNING">Running</option>
-            <option value="ATLETISMO">Atletismo</option>
-            <option value="CICLISMO">Ciclismo</option>
-          </select>
-          <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)}
-            style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', padding: '8px 12px', color: 'rgba(255,255,255,0.7)', fontSize: '13px', cursor: 'pointer' }}>
-            <option value="TODOS">Todos los estados</option>
-            <option value="PROXIMO">Próximo</option>
-            <option value="ACTIVO">Activo</option>
-            <option value="COMPLETADO">Completado</option>
-          </select>
+        )}
+
+        {/* FILTROS */}
+        <div style={{ backgroundColor: '#1e293b', padding: '12px 28px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '7px 12px', flex: 1, maxWidth: '260px' }}>
+            <Search size={13} color="rgba(255,255,255,0.4)" />
+            <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar galería..."
+              style={{ background: 'none', border: 'none', outline: 'none', color: 'white', fontSize: '13px', width: '100%' }} />
+          </div>
+          {['TODOS', 'PROXIMO', 'ACTIVO', 'COMPLETADO'].map((s) => (
+            <button key={s} onClick={() => setFiltroStatus(s)}
+              style={{ padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 700, backgroundColor: filtroStatus === s ? '#0ea5e9' : 'rgba(255,255,255,0.06)', color: filtroStatus === s ? 'white' : 'rgba(255,255,255,0.4)' }}>
+              {s === 'TODOS' ? 'Todos' : s.charAt(0) + s.slice(1).toLowerCase()}
+            </button>
+          ))}
           <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px', marginLeft: 'auto' }}>
-            {eventosFiltrados.length} de {eventos.length} galerías
+            {eventosFiltrados.length} de {eventos.length}
           </span>
         </div>
 
         {/* GRID */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
           {cargando ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
               {[...Array(6)].map((_, i) => (
-                <div key={i} style={{ backgroundColor: '#1e293b', borderRadius: '16px', aspectRatio: '16/10' }} />
+                <div key={i} style={{ backgroundColor: '#1e293b', borderRadius: '16px', height: '280px' }} />
               ))}
             </div>
           ) : eventosFiltrados.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '80px', color: 'rgba(255,255,255,0.3)' }}>
-              <p style={{ fontWeight: 700, fontSize: '18px', marginBottom: '8px' }}>No hay galerías</p>
-              <p style={{ fontSize: '14px', marginBottom: '20px' }}>Crea tu primera galería de fotos</p>
+              <Camera size={48} style={{ margin: '0 auto 16px', display: 'block', opacity: 0.3 }} />
+              <p style={{ fontWeight: 700, fontSize: '18px', marginBottom: '8px', color: 'rgba(255,255,255,0.5)' }}>No hay galerías</p>
               <button onClick={() => setMostrarForm(true)}
-                style={{ backgroundColor: '#FF6B00', color: 'white', border: 'none', borderRadius: '10px', padding: '12px 24px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
-                + Crear galería
+                style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px 24px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', marginTop: '12px' }}>
+                + Crear primera galería
               </button>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-              {eventosFiltrados.map((evento) => (
-                <div key={evento.id} style={{ backgroundColor: '#1e293b', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ position: 'relative', aspectRatio: '16/10', backgroundColor: '#0f172a', overflow: 'hidden' }}>
-                    {evento.cover_url ? (
-                      <img src={evento.cover_url} alt={evento.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #1e3a5f, #7c2d12)' }}>
-                        <Image size={40} color="rgba(255,255,255,0.2)" />
-                      </div>
-                    )}
-                    <span style={{ position: 'absolute', top: '10px', right: '10px', ...colorStatus(evento.status), fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px' }}>
-                      {evento.status}
-                    </span>
-                    <span style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px' }}>
-                      {evento.tipo}
-                    </span>
-                  </div>
-                  <div style={{ padding: '16px' }}>
-                    <h3 style={{ color: 'white', fontWeight: 800, fontSize: '15px', marginBottom: '8px', lineHeight: 1.3 }}>
-                      {evento.nombre}
-                    </h3>
-                    <div style={{ display: 'flex', gap: '12px', color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginBottom: '16px' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <MapPin size={11} /> {evento.ciudad}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+              {eventosFiltrados.map((evento) => {
+                const sc = colorStatus(evento.status);
+                return (
+                  <div key={evento.id} style={{ backgroundColor: '#1e293b', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ position: 'relative', aspectRatio: '16/9', backgroundColor: '#0f172a' }}>
+                      {evento.cover_url ? (
+                        <img src={evento.cover_url} alt={evento.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #0f172a, #1e1b4b)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Image size={32} color="rgba(255,255,255,0.1)" />
+                        </div>
+                      )}
+                      <span style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(0,0,0,0.65)', color: 'white', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px' }}>
+                        {evento.tipo}
                       </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Calendar size={11} /> {new Date(evento.fecha).toLocaleDateString('es-EC')}
+                      <span style={{ position: 'absolute', top: '10px', right: '10px', backgroundColor: sc.bg, color: sc.color, fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px' }}>
+                        {evento.status}
+                      </span>
+                      <span style={{ position: 'absolute', bottom: '10px', right: '10px', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', fontSize: '11px', fontWeight: 600, padding: '3px 8px', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Image size={10} /> {evento._count.fotos} fotos
                       </span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Image size={12} /> {evento._count.fotos} fotos
-                      </span>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <Link href={`/eventos/${evento.id}`}
-                          style={{ padding: '6px 12px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', textDecoration: 'none', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: 600 }}>
-                          Ver
+
+                    <div style={{ padding: '16px' }}>
+                      <h3 style={{ color: 'white', fontWeight: 800, fontSize: '15px', marginBottom: '6px', lineHeight: 1.3 }}>
+                        {evento.nombre}
+                      </h3>
+                      <div style={{ display: 'flex', gap: '12px', color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginBottom: '12px' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <MapPin size={11} /> {evento.ciudad}
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Calendar size={11} /> {new Date(evento.fecha).toLocaleDateString('es-EC')}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                        <div style={{ flex: 1, backgroundColor: 'rgba(14,165,233,0.1)', borderRadius: '8px', padding: '7px 10px', border: '1px solid rgba(14,165,233,0.2)' }}>
+                          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '9px', fontWeight: 700, marginBottom: '2px' }}>INDIVIDUAL</p>
+                          <p style={{ color: '#38bdf8', fontWeight: 900, fontSize: '15px' }}>${evento.precio_individual || 5.99}</p>
+                        </div>
+                        <div style={{ flex: 1, backgroundColor: 'rgba(99,102,241,0.1)', borderRadius: '8px', padding: '7px 10px', border: '1px solid rgba(99,102,241,0.2)' }}>
+                          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '9px', fontWeight: 700, marginBottom: '2px' }}>PHOTOPASS</p>
+                          <p style={{ color: '#a78bfa', fontWeight: 900, fontSize: '15px' }}>${evento.precio_photopass || 11.99}</p>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <Link href={`/admin/eventos/${evento.id}`}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', textDecoration: 'none', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 600 }}>
+                          <Eye size={11} /> Ver fotos ({evento._count.fotos})
                         </Link>
-                        <button onClick={() => { setEventoSeleccionado(evento.id); setMostrarFormFoto(true); }}
-                          style={{ padding: '6px 12px', backgroundColor: '#FF6B00', border: 'none', borderRadius: '8px', color: 'white', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
-                          + Fotos
+                        <button onClick={() => { setEventoSeleccionado(evento); setFotosSubidas(0); setMostrarSubirFoto(true); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', border: 'none', borderRadius: '8px', color: 'white', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
+                          <Upload size={11} /> Subir
                         </button>
+                        <button onClick={() => abrirPrecios(evento)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', backgroundColor: 'rgba(250,204,21,0.1)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: '8px', color: '#facc15', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
+                          <DollarSign size={11} /> Precios
+                        </button>
+                        <select value={evento.status} onChange={(e) => cambiarStatus(evento.id, e.target.value)}
+                          style={{ padding: '6px 8px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.6)', fontSize: '11px', cursor: 'pointer', outline: 'none' }}>
+                          <option value="PROXIMO">Próximo</option>
+                          <option value="ACTIVO">Activo</option>
+                          <option value="COMPLETADO">Completado</option>
+                        </select>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -316,37 +368,63 @@ export default function AdminPage() {
       {/* MODAL CREAR EVENTO */}
       {mostrarForm && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ backgroundColor: '#1e293b', borderRadius: '20px', padding: '32px', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'white', marginBottom: '24px' }}>Crear nueva galería</h2>
+          <div style={{ backgroundColor: '#1e293b', borderRadius: '20px', padding: '32px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'white' }}>Crear nueva galería</h2>
+              <button onClick={() => setMostrarForm(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
             <form onSubmit={crearEvento}>
               {[
-                { label: 'Nombre del evento', key: 'nombre', type: 'text', placeholder: 'Half Marathon Manta 2026' },
-                { label: 'Ciudad', key: 'ciudad', type: 'text', placeholder: 'Manta' },
-                { label: 'Fecha del evento', key: 'fecha', type: 'datetime-local', placeholder: '' },
-                { label: 'URL de portada (opcional)', key: 'cover_url', type: 'url', placeholder: 'https://...' },
+                { label: 'Nombre del evento', key: 'nombre', type: 'text', placeholder: 'Half Marathon Manta 2026', required: true },
+                { label: 'Ciudad', key: 'ciudad', type: 'text', placeholder: 'Manta', required: true },
+                { label: 'Fecha del evento', key: 'fecha', type: 'datetime-local', placeholder: '', required: true },
+                { label: 'URL de portada (opcional)', key: 'cover_url', type: 'url', placeholder: 'https://...', required: false },
               ].map((campo) => (
-                <div key={campo.key} style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>{campo.label}</label>
-                  <input type={campo.type} required={campo.key !== 'cover_url'}
+                <div key={campo.key} style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>
+                    {campo.label}
+                  </label>
+                  <input type={campo.type} required={campo.required}
                     value={form[campo.key as keyof typeof form]}
                     onChange={(e) => setForm({ ...form, [campo.key]: e.target.value })}
                     placeholder={campo.placeholder}
                     style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }} />
                 </div>
               ))}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Tipo de evento</label>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Tipo</label>
                 <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}
                   style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }}>
                   <option value="RUNNING">Running</option>
                   <option value="ATLETISMO">Atletismo</option>
                   <option value="CICLISMO">Ciclismo</option>
+                  <option value="TRIATHLON">Triatlón</option>
+                  <option value="TRAIL">Trail</option>
                 </select>
               </div>
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Descripción (opcional)</label>
+              <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '14px' }}>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase' }}>Precios</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '6px' }}>Individual ($)</label>
+                    <input type="number" step="0.01" min="0.99" required value={form.precio_individual}
+                      onChange={(e) => setForm({ ...form, precio_individual: e.target.value })}
+                      style={{ width: '100%', backgroundColor: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '10px', padding: '10px 12px', fontSize: '16px', fontWeight: 800, color: '#38bdf8', outline: 'none', boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '6px' }}>Photopass ($)</label>
+                    <input type="number" step="0.01" min="0.99" required value={form.precio_photopass}
+                      onChange={(e) => setForm({ ...form, precio_photopass: e.target.value })}
+                      style={{ width: '100%', backgroundColor: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '10px', padding: '10px 12px', fontSize: '16px', fontWeight: 800, color: '#a78bfa', outline: 'none', boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Descripción (opcional)</label>
                 <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-                  placeholder="Descripción del evento..." rows={3}
+                  placeholder="Descripción del evento..." rows={2}
                   style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box', resize: 'vertical' }} />
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>
@@ -355,7 +433,7 @@ export default function AdminPage() {
                   Cancelar
                 </button>
                 <button type="submit" disabled={creando}
-                  style={{ flex: 1, backgroundColor: creando ? '#666' : '#FF6B00', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: creando ? 'not-allowed' : 'pointer' }}>
+                  style={{ flex: 1, background: creando ? '#334155' : 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: creando ? 'not-allowed' : 'pointer' }}>
                   {creando ? 'Creando...' : 'Crear galería'}
                 </button>
               </div>
@@ -365,94 +443,71 @@ export default function AdminPage() {
       )}
 
       {/* MODAL SUBIR FOTO */}
-      {mostrarFormFoto && (
+      {mostrarSubirFoto && eventoSeleccionado && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ backgroundColor: '#1e293b', borderRadius: '20px', padding: '32px', width: '100%', maxWidth: '480px', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'white', marginBottom: '8px' }}>Subir foto</h2>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px' }}>
-              Sube desde tu PC o ingresa una URL
+          <div style={{ backgroundColor: '#1e293b', borderRadius: '20px', padding: '32px', width: '100%', maxWidth: '500px', border: '1px solid rgba(255,255,255,0.1)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'white' }}>Subir fotos</h2>
+              <button onClick={cerrarModalFoto} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '8px' }}>
+              {eventoSeleccionado.nombre}
             </p>
+            <div style={{ backgroundColor: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '8px', padding: '8px 12px', marginBottom: '16px' }}>
+              <p style={{ color: '#38bdf8', fontSize: '12px', fontWeight: 600 }}>
+                🔒 La marca de agua se genera automáticamente al subir el archivo
+              </p>
+            </div>
             <form onSubmit={subirFoto}>
-
-              {/* Zona arrastrar/subir */}
               <div
-                onClick={() => document.getElementById('inputFoto')?.click()}
+                onClick={() => document.getElementById('inputFotoAdmin')?.click()}
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const file = e.dataTransfer.files[0];
-                  if (file) manejarArchivo(file);
-                }}
-                style={{
-                  border: '2px dashed rgba(255,255,255,0.15)', borderRadius: '12px',
-                  padding: '24px', textAlign: 'center', cursor: 'pointer',
-                  marginBottom: '16px', backgroundColor: 'rgba(255,255,255,0.03)'
-                }}>
-                <input id="inputFoto" type="file" accept="image/jpeg,image/png,image/webp"
-                  style={{ display: 'none' }}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) manejarArchivo(file);
-                  }} />
+                onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) manejarArchivo(f); }}
+                style={{ border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '14px', padding: '28px', textAlign: 'center', cursor: 'pointer', marginBottom: '16px', backgroundColor: 'rgba(255,255,255,0.02)' }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = '#0ea5e9'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.1)'; }}>
+                <input id="inputFotoAdmin" type="file" accept="image/*" style={{ display: 'none' }}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) manejarArchivo(f); }} />
                 {previewFoto ? (
-                  <img src={previewFoto} alt="preview"
-                    style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '8px' }} />
+                  <img src={previewFoto} alt="preview" style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '10px' }} />
                 ) : (
                   <>
-                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>📸</div>
-                    <p style={{ color: 'white', fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>
-                      Arrastra una foto aquí
-                    </p>
-                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>
-                      o haz clic para seleccionar · JPG, PNG, WEBP · máx 10MB
-                    </p>
+                    <Upload size={28} color="rgba(255,255,255,0.3)" style={{ margin: '0 auto 10px', display: 'block' }} />
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>Arrastra aquí o clic para seleccionar</p>
+                    <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>JPG, PNG, WEBP · máx 10MB</p>
                   </>
                 )}
               </div>
 
               {archivoFoto && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px' }}>
                   <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>📁 {archivoFoto.name}</span>
-                  <button type="button" onClick={() => { setArchivoFoto(null); setPreviewFoto(''); }}
-                    style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '18px', lineHeight: 1 }}>✕</button>
+                  <button type="button" onClick={() => { setArchivoFoto(null); setPreviewFoto(''); setUrlWatermark(''); }}
+                    style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
                 </div>
               )}
 
-              {/* Separador O */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.1)' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
                 <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>o ingresa URL</span>
-                <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.1)' }} />
+                <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
               </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <input type="url" value={formFoto.gcs_original_url}
-                  onChange={(e) => {
-                    setFormFoto({ ...formFoto, gcs_original_url: e.target.value });
-                    if (e.target.value) { setArchivoFoto(null); setPreviewFoto(''); }
-                  }}
-                  placeholder="https://images.unsplash.com/..."
-                  style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              {formFoto.gcs_original_url && (
-                <div style={{ marginBottom: '16px' }}>
-                  <img src={formFoto.gcs_original_url} alt="preview"
-                    style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '10px' }}
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                </div>
-              )}
+              <input type="url" value={urlFoto}
+                onChange={(e) => { setUrlFoto(e.target.value); if (e.target.value) { setArchivoFoto(null); setPreviewFoto(''); } }}
+                placeholder="https://..."
+                style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box', marginBottom: '16px' }} />
 
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button type="button" onClick={cerrarModalFoto}
                   style={{ flex: 1, border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
                   Cancelar
                 </button>
-                <button type="submit"
-                  disabled={subiendoFoto || (!archivoFoto && !formFoto.gcs_original_url)}
-                  style={{ flex: 1, backgroundColor: subiendoFoto || (!archivoFoto && !formFoto.gcs_original_url) ? '#444' : '#FF6B00', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
-                  {subiendoFoto ? 'Subiendo...' : 'Agregar foto'}
+                <button type="submit" disabled={subiendoFoto || (!archivoFoto && !urlFoto)}
+                  style={{ flex: 1, background: subiendoFoto || (!archivoFoto && !urlFoto) ? '#334155' : 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+                  {subiendoFoto ? 'Subiendo...' : '+ Subir foto'}
                 </button>
               </div>
             </form>
@@ -460,6 +515,46 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* MODAL PRECIOS */}
+      {mostrarPrecios && eventoPrecios && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ backgroundColor: '#1e293b', borderRadius: '20px', padding: '32px', width: '100%', maxWidth: '420px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'white' }}>Editar precios</h2>
+              <button onClick={() => setMostrarPrecios(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px' }}>{eventoPrecios.nombre}</p>
+            <form onSubmit={guardarPrecios}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                <div>
+                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>Individual ($)</label>
+                  <input type="number" step="0.01" min="0.99" required value={precioInd}
+                    onChange={(e) => setPrecioInd(e.target.value)}
+                    style={{ width: '100%', backgroundColor: 'rgba(14,165,233,0.1)', border: '2px solid rgba(14,165,233,0.3)', borderRadius: '12px', padding: '12px', fontSize: '22px', fontWeight: 900, color: '#38bdf8', outline: 'none', boxSizing: 'border-box', textAlign: 'center' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>Photopass ($)</label>
+                  <input type="number" step="0.01" min="0.99" required value={precioPass}
+                    onChange={(e) => setPrecioPass(e.target.value)}
+                    style={{ width: '100%', backgroundColor: 'rgba(99,102,241,0.1)', border: '2px solid rgba(99,102,241,0.3)', borderRadius: '12px', padding: '12px', fontSize: '22px', fontWeight: 900, color: '#a78bfa', outline: 'none', boxSizing: 'border-box', textAlign: 'center' }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button type="button" onClick={() => setMostrarPrecios(false)}
+                  style={{ flex: 1, border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
+                  Cancelar
+                </button>
+                <button type="submit" disabled={guardandoPrecios}
+                  style={{ flex: 2, background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+                  {guardandoPrecios ? 'Guardando...' : 'Guardar precios'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

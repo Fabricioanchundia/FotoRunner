@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id
+  nombre       String
+  avatar_url   String?
+  face_vector  String?
+  face_matches FaceMatch[]
+
+  @@map("users")
+}
+
+model Photo {
+  id                String      @id
+  event_id          String
+  gcs_original_url  String
+  gcs_watermark_url String?
+  processed_at      DateTime?
+  face_matches      FaceMatch[]
+
+  @@map("photos")
+}
+
+model FaceMatch {
+  id               String   @id @default(cuid())
+  photo_id         String
+  user_id          String
+  confidence_score Float
+  created_at       DateTime @default(now())
+
+  foto Photo @relation(fields: [photo_id], references: [id])
+  user User  @relation(fields: [user_id], references: [id])
+
+  @@unique([photo_id, user_id])
+  @@map("face_matches")
+}

@@ -6,6 +6,7 @@ import logger from '../utils/logger';
 import { RequestAutenticado } from '../middlewares/auth.middleware';
 
 const prisma = new PrismaClient();
+const MS_FACIAL_URL = process.env['MS_FACIAL_URL'] || 'http://localhost:3002';
 
 const schemaSubirFoto = z.object({
   event_id: z.string().min(1, 'El ID del evento es requerido'),
@@ -20,10 +21,7 @@ export const listarFotosEvento = async (
   try {
     const event_id = String(req.params['id']);
 
-    const evento = await prisma.event.findUnique({
-      where: { id: event_id }
-    });
-
+    const evento = await prisma.event.findUnique({ where: { id: event_id } });
     if (!evento) {
       responderError(res, 'Evento no encontrado', 404);
       return;
@@ -51,16 +49,27 @@ export const listarMisFotos = async (
       ? String(req.query['event_id'])
       : undefined;
 
+    // Intentar usar ms-facial primero
+    try {
+      const url = `${MS_FACIAL_URL}/api/facial/buscar/${user_id}${event_id ? `?event_id=${event_id}` : ''}`;
+      const response = await fetch(url);
+      const data = await response.json() as { exito: boolean; datos: any[] };
+
+      if (data.exito && Array.isArray(data.datos)) {
+        responderExito(res, data.datos, 'Mis fotos obtenidas exitosamente');
+        return;
+      }
+    } catch (err) {
+      logger.warn(`MS-Facial no disponible, usando fallback: ${err}`);
+    }
+
+    // Fallback — buscar directamente en la BD
     const matches = await prisma.faceMatch.findMany({
       where: {
         user_id,
-        ...(event_id && {
-          foto: { event_id }
-        })
+        ...(event_id && { foto: { event_id } })
       },
-      include: {
-        foto: true
-      },
+      include: { foto: true },
       orderBy: { created_at: 'desc' }
     });
 
@@ -96,7 +105,7 @@ export const subirFoto = async (
       return;
     }
 
-    if (evento.admin_id !== req.usuario!.id) {
+    if (evento.admin_id !== req.usuario!.id && req.usuario?.role !== 'ADMIN') {
       responderError(res, 'Solo el admin del evento puede subir fotos', 403);
       return;
     }
@@ -108,6 +117,16 @@ export const subirFoto = async (
         gcs_watermark_url: datos.data.gcs_watermark_url ?? null
       }
     });
+
+    // Notificar al ms-facial en background — no bloquea la respuesta
+    fetch(`${MS_FACIAL_URL}/api/facial/procesar-foto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        photo_id: foto.id,
+        photo_url: foto.gcs_original_url
+      })
+    }).catch(err => logger.warn(`MS-Facial procesar-foto error: ${err}`));
 
     logger.info(`Foto subida al evento ${datos.data.event_id}`);
     responderExito(res, foto, 'Foto subida exitosamente', 201);
@@ -134,11 +153,13 @@ export const eliminarFoto = async (
       return;
     }
 
-    if (foto.evento.admin_id !== req.usuario!.id) {
+    if (foto.evento.admin_id !== req.usuario!.id && req.usuario?.role !== 'ADMIN') {
       responderError(res, 'Solo el admin puede eliminar fotos', 403);
       return;
     }
 
+    await prisma.orderPhoto.deleteMany({ where: { photo_id: id } });
+    await prisma.faceMatch.deleteMany({ where: { photo_id: id } });
     await prisma.photo.delete({ where: { id } });
 
     logger.info(`Foto eliminada: ${id}`);
