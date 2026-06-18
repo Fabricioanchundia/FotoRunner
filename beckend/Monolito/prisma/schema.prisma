@@ -88,6 +88,7 @@ model Event {
   status            EventoStatus @default(PROXIMO)
   precio_individual Float        @default(5.99)
   precio_photopass  Float        @default(11.99)
+  disponible_hasta  DateTime?
   admin_id          String
   created_at        DateTime     @default(now())
 
@@ -104,6 +105,7 @@ model Photo {
   event_id          String
   gcs_original_url  String
   gcs_watermark_url String?
+  tamano_bytes      Int?
   processed_at      DateTime?
   created_at        DateTime  @default(now())
 

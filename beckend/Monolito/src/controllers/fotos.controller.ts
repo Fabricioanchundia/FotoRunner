@@ -118,6 +118,14 @@ export const subirFoto = async (
       }
     });
 
+    // La portada siempre se actualiza con la foto más reciente subida. El
+    // admin puede sobreescribirla en cualquier momento eligiendo otra foto
+    // específica como portada con el botón "Usar como portada".
+    await prisma.event.update({
+      where: { id: evento.id },
+      data: { cover_url: foto.gcs_watermark_url ?? foto.gcs_original_url }
+    });
+
     // Notificar al ms-facial en background — no bloquea la respuesta
     fetch(`${MS_FACIAL_URL}/api/facial/procesar-foto`, {
       method: 'POST',
@@ -133,6 +141,41 @@ export const subirFoto = async (
   } catch (error) {
     logger.error(`Error al subir foto: ${error}`);
     responderError(res, 'Error al subir foto', 500);
+  }
+};
+
+export const usarComoPortada = async (
+  req: RequestAutenticado,
+  res: Response
+): Promise<void> => {
+  try {
+    const id = String(req.params['id']);
+
+    const foto = await prisma.photo.findUnique({
+      where: { id },
+      include: { evento: true }
+    });
+
+    if (!foto) {
+      responderError(res, 'Foto no encontrada', 404);
+      return;
+    }
+
+    if (foto.evento.admin_id !== req.usuario!.id && req.usuario?.role !== 'ADMIN') {
+      responderError(res, 'Solo el admin puede cambiar la portada', 403);
+      return;
+    }
+
+    const evento = await prisma.event.update({
+      where: { id: foto.event_id },
+      data: { cover_url: foto.gcs_watermark_url ?? foto.gcs_original_url }
+    });
+
+    logger.info(`Portada del evento ${foto.event_id} actualizada con la foto ${id}`);
+    responderExito(res, evento, 'Portada actualizada exitosamente');
+  } catch (error) {
+    logger.error(`Error al actualizar portada: ${error}`);
+    responderError(res, 'Error al actualizar portada', 500);
   }
 };
 

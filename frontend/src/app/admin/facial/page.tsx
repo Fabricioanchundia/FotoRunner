@@ -3,16 +3,16 @@ import AdminSidebar from '@/components/AdminSidebar';
 
 export default function AdminFacialPage() {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#0f172a' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#16142a' }}>
       <AdminSidebar />
-      <div style={{ flex: 1, padding: '32px' }}>
+      <div style={{ flex: 1, padding: '32px', backgroundColor: '#16142a' }}>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginBottom: '4px' }}>Panel admin</p>
         <h1 style={{ color: 'white', fontSize: '24px', fontWeight: 800, marginBottom: '8px' }}>Facial cloud</h1>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', marginBottom: '32px' }}>
           Reconocimiento facial automático — requiere configurar Google Cloud Vision API
         </p>
 
-        <div style={{ backgroundColor: '#1e293b', borderRadius: '16px', padding: '32px', border: '1px solid rgba(255,255,255,0.06)', maxWidth: '600px' }}>
+        <div style={{ backgroundColor: '#1d1a38', borderRadius: '16px', padding: '32px', border: '1px solid rgba(165,180,252,0.1)', maxWidth: '600px' }}>
           <p style={{ fontSize: '48px', marginBottom: '16px', textAlign: 'center' }}>🤖</p>
           <h2 style={{ color: 'white', fontSize: '18px', fontWeight: 700, marginBottom: '12px', textAlign: 'center' }}>
             Reconocimiento facial

@@ -13,7 +13,8 @@ const schemaEvento = z.object({
   fecha: z.string().datetime(),
   ciudad: z.string().min(2),
   tipo: z.enum(['RUNNING', 'ATLETISMO', 'CICLISMO']),
-  cover_url: z.string().url().optional()
+  cover_url: z.string().url().optional(),
+  disponible_hasta: z.string().datetime().optional()
 });
 
 export const listarEventos = async (
@@ -86,6 +87,7 @@ export const crearEvento = async (
       data: {
         ...datos.data,
         fecha: new Date(datos.data.fecha),
+        ...(datos.data.disponible_hasta && { disponible_hasta: new Date(datos.data.disponible_hasta) }),
         admin_id: req.usuario!.id
       }
     });
@@ -130,7 +132,8 @@ export const actualizarEvento = async (
       where: { id },
       data: {
         ...datos.data,
-        ...(datos.data.fecha && { fecha: new Date(datos.data.fecha) })
+        ...(datos.data.fecha && { fecha: new Date(datos.data.fecha) }),
+        ...(datos.data.disponible_hasta && { disponible_hasta: new Date(datos.data.disponible_hasta) })
       }
     });
 

@@ -17,16 +17,31 @@ export default function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <div style={{ width: '240px', backgroundColor: '#1e293b', flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-          <img src="/Logo.png" alt="FR" style={{ width: '32px', height: '32px', objectFit: 'contain' }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          <span style={{ fontWeight: 800, fontSize: '16px', color: 'white', letterSpacing: '2px' }}>FOTORUNNER</span>
+    <div style={{
+      width: '252px', flexShrink: 0, minHeight: '100vh',
+      display: 'flex', flexDirection: 'column',
+      backgroundColor: '#221f42',
+      borderRight: '1px solid rgba(129,140,248,0.18)',
+    }}>
+      <div style={{ padding: '26px 22px 22px', borderBottom: '1px solid rgba(165,180,252,0.15)' }}>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '11px', textDecoration: 'none' }}>
+          <div style={{
+            width: '36px', height: '36px', borderRadius: '9px',
+            backgroundColor: 'white',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.25)', flexShrink: 0,
+          }}>
+            <img src="/Logo.png" alt="FR" style={{ width: '24px', height: '24px', objectFit: 'contain' }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          </div>
+          <span style={{ fontWeight: 800, fontSize: '15px', color: 'white', letterSpacing: '1.5px' }}>FOTORUNNER</span>
         </Link>
+        <p style={{ marginTop: '14px', marginBottom: 0, fontSize: '10px', fontWeight: 700, color: '#c7d2fe', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+          Panel administrador
+        </p>
       </div>
 
-      <nav style={{ padding: '16px 12px', flex: 1 }}>
+      <nav style={{ padding: '18px 14px', flex: 1 }}>
         {items.map((item) => {
           const active = pathname === item.href;
           return (
@@ -34,21 +49,26 @@ export default function AdminSidebar() {
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '12px',
                 padding: '10px 12px', borderRadius: '10px',
-                backgroundColor: active ? '#FF6B00' : 'transparent',
-                color: active ? 'white' : 'rgba(255,255,255,0.5)',
+                background: active ? 'linear-gradient(135deg, #4f46e5, #7c3aed)' : 'transparent',
+                color: active ? 'white' : '#c7d2fe',
                 fontSize: '14px', fontWeight: active ? 700 : 500,
-                marginBottom: '4px', cursor: 'pointer',
+                marginBottom: '3px', cursor: 'pointer',
+                boxShadow: active ? '0 4px 14px rgba(79,70,229,0.4)' : 'none',
+                transition: 'background-color 0.15s, color 0.15s',
               }}>
-                {item.icon} {item.label}
+                <span style={{ display: 'flex', color: active ? 'white' : '#a5b4fc' }}>
+                  {item.icon}
+                </span>
+                {item.label}
               </div>
             </Link>
           );
         })}
       </nav>
 
-      <div style={{ padding: '16px 12px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+      <div style={{ padding: '14px', borderTop: '1px solid rgba(165,180,252,0.15)' }}>
         <button onClick={cerrarSesion}
-          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: '14px', fontWeight: 500 }}>
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent', color: '#a5b4fc', fontSize: '14px', fontWeight: 500 }}>
           <LogOut size={18} /> Cerrar sesión
         </button>
       </div>

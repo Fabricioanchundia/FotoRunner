@@ -44,9 +44,9 @@ export default function AdminUsuariosPage() {
   );
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#0f172a' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#16142a' }}>
       <AdminSidebar />
-      <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
+      <div style={{ flex: 1, padding: '32px', overflowY: 'auto', backgroundColor: '#16142a' }}>
         <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginBottom: '4px' }}>Panel admin</p>
@@ -60,7 +60,7 @@ export default function AdminUsuariosPage() {
           </div>
         </div>
 
-        <div style={{ backgroundColor: '#1e293b', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+        <div style={{ backgroundColor: '#1d1a38', borderRadius: '16px', border: '1px solid rgba(165,180,252,0.1)', overflow: 'hidden' }}>
           <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: '16px' }}>
             <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', flex: 2 }}>USUARIO</span>
             <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', flex: 1 }}>COMPRAS</span>

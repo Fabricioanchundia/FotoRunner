@@ -31,9 +31,9 @@ export default function AdminMonitorPage() {
   ] : [];
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#0f172a' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#16142a' }}>
       <AdminSidebar />
-      <div style={{ flex: 1, padding: '32px' }}>
+      <div style={{ flex: 1, padding: '32px', backgroundColor: '#16142a' }}>
         <div style={{ marginBottom: '32px' }}>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginBottom: '4px' }}>Panel admin</p>
           <h1 style={{ color: 'white', fontSize: '24px', fontWeight: 800 }}>Mi monitor</h1>
@@ -43,13 +43,13 @@ export default function AdminMonitorPage() {
         {cargando ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
             {[...Array(5)].map((_, i) => (
-              <div key={i} style={{ backgroundColor: '#1e293b', borderRadius: '16px', height: '120px' }} />
+              <div key={i} style={{ backgroundColor: '#1d1a38', borderRadius: '16px', height: '120px' }} />
             ))}
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
             {tarjetas.map((t) => (
-              <div key={t.label} style={{ backgroundColor: '#1e293b', borderRadius: '16px', padding: '24px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div key={t.label} style={{ backgroundColor: '#1d1a38', borderRadius: '16px', padding: '24px', border: '1px solid rgba(165,180,252,0.1)' }}>
                 <p style={{ fontSize: '32px', marginBottom: '8px' }}>{t.emoji}</p>
                 <p style={{ color: t.color, fontSize: '32px', fontWeight: 900, marginBottom: '4px' }}>{t.valor}</p>
                 <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>{t.label}</p>

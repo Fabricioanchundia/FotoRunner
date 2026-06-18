@@ -19,6 +19,7 @@ interface Evento {
   tipo: string;
   status: string;
   cover_url: string | null;
+  disponible_hasta?: string | null;
   precio_individual: number;
   precio_photopass: number;
   _count: { fotos: number };
@@ -45,7 +46,7 @@ export default function AdminPage() {
   const [creando, setCreando] = useState(false);
   const [form, setForm] = useState({
     nombre: '', ciudad: '', fecha: '', tipo: 'RUNNING',
-    descripcion: '', cover_url: '',
+    descripcion: '', cover_url: '', disponible_hasta: '',
     precio_individual: '5.99', precio_photopass: '11.99'
   });
 
@@ -90,12 +91,15 @@ export default function AdminPage() {
       await api.post('/eventos', {
         ...form,
         fecha: new Date(form.fecha).toISOString(),
+        ...(form.disponible_hasta
+          ? { disponible_hasta: new Date(form.disponible_hasta).toISOString() }
+          : { disponible_hasta: undefined }),
         precio_individual: Number(form.precio_individual),
         precio_photopass: Number(form.precio_photopass)
       });
       toast.success('Evento creado exitosamente');
       setMostrarForm(false);
-      setForm({ nombre: '', ciudad: '', fecha: '', tipo: 'RUNNING', descripcion: '', cover_url: '', precio_individual: '5.99', precio_photopass: '11.99' });
+      setForm({ nombre: '', ciudad: '', fecha: '', tipo: 'RUNNING', descripcion: '', cover_url: '', disponible_hasta: '', precio_individual: '5.99', precio_photopass: '11.99' });
       cargarTodo();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { mensaje?: string } } };
@@ -213,13 +217,13 @@ export default function AdminPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#0f172a' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#16142a' }}>
       <AdminSidebar />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: '#16142a' }}>
 
         {/* TOPBAR */}
-        <div style={{ backgroundColor: '#1e293b', padding: '16px 28px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ backgroundColor: '#1d1a38', padding: '16px 28px', borderBottom: '1px solid rgba(165,180,252,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginBottom: '2px' }}>Panel administrador</p>
             <h1 style={{ color: 'white', fontSize: '20px', fontWeight: 800 }}>Mis galerías</h1>
@@ -232,7 +236,7 @@ export default function AdminPage() {
 
         {/* STATS */}
         {stats && (
-          <div style={{ backgroundColor: '#1e293b', padding: '12px 28px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ backgroundColor: '#1d1a38', padding: '12px 28px', borderBottom: '1px solid rgba(165,180,252,0.1)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {[
               { label: 'Eventos', valor: stats.totalEventos, icon: <Calendar size={13} />, color: '#0ea5e9' },
               { label: 'Fotos', valor: stats.totalFotos, icon: <Camera size={13} />, color: '#a78bfa' },
@@ -252,7 +256,7 @@ export default function AdminPage() {
         )}
 
         {/* FILTROS */}
-        <div style={{ backgroundColor: '#1e293b', padding: '12px 28px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ backgroundColor: '#1d1a38', padding: '12px 28px', borderBottom: '1px solid rgba(165,180,252,0.1)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '7px 12px', flex: 1, maxWidth: '260px' }}>
             <Search size={13} color="rgba(255,255,255,0.4)" />
             <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
@@ -271,11 +275,11 @@ export default function AdminPage() {
         </div>
 
         {/* GRID */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', backgroundColor: '#16142a' }}>
           {cargando ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
               {[...Array(6)].map((_, i) => (
-                <div key={i} style={{ backgroundColor: '#1e293b', borderRadius: '16px', height: '280px' }} />
+                <div key={i} style={{ backgroundColor: '#1d1a38', borderRadius: '16px', height: '280px' }} />
               ))}
             </div>
           ) : eventosFiltrados.length === 0 ? (
@@ -292,7 +296,7 @@ export default function AdminPage() {
               {eventosFiltrados.map((evento) => {
                 const sc = colorStatus(evento.status);
                 return (
-                  <div key={evento.id} style={{ backgroundColor: '#1e293b', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div key={evento.id} style={{ background: 'linear-gradient(160deg, #1e1b4b, #1e1b4b)', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(165,180,252,0.1)' }}>
                     <div style={{ position: 'relative', aspectRatio: '16/9', backgroundColor: '#0f172a' }}>
                       {evento.cover_url ? (
                         <img src={evento.cover_url} alt={evento.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -346,7 +350,7 @@ export default function AdminPage() {
                           <Upload size={11} /> Subir
                         </button>
                         <button onClick={() => abrirPrecios(evento)}
-                          style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', backgroundColor: 'rgba(250,204,21,0.1)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: '8px', color: '#facc15', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', backgroundColor: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '8px', color: '#c4b5fd', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
                           <DollarSign size={11} /> Precios
                         </button>
                         <select value={evento.status} onChange={(e) => cambiarStatus(evento.id, e.target.value)}
@@ -380,6 +384,7 @@ export default function AdminPage() {
                 { label: 'Nombre del evento', key: 'nombre', type: 'text', placeholder: 'Half Marathon Manta 2026', required: true },
                 { label: 'Ciudad', key: 'ciudad', type: 'text', placeholder: 'Manta', required: true },
                 { label: 'Fecha del evento', key: 'fecha', type: 'datetime-local', placeholder: '', required: true },
+                { label: 'Disponible hasta (opcional)', key: 'disponible_hasta', type: 'datetime-local', placeholder: '', required: false },
                 { label: 'URL de portada (opcional)', key: 'cover_url', type: 'url', placeholder: 'https://...', required: false },
               ].map((campo) => (
                 <div key={campo.key} style={{ marginBottom: '14px' }}>

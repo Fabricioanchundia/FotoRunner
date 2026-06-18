@@ -101,14 +101,16 @@ router.post(
 
       responderExito(res, {
         url: urlOriginal,
-        url_watermark: urlWatermark
+        url_watermark: urlWatermark,
+        tamano_bytes: req.file.size
       }, 'Foto subida exitosamente');
     } catch (err) {
       // Si falla la marca de agua, devolver solo la original
       console.error('Error generando marca de agua:', err);
       responderExito(res, {
         url: urlOriginal,
-        url_watermark: urlOriginal
+        url_watermark: urlOriginal,
+        tamano_bytes: req.file.size
       }, 'Foto subida (sin marca de agua)');
     }
   }

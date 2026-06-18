@@ -6,6 +6,7 @@ import { Trash2, ShoppingCart, ChevronRight, Package, Image, ArrowLeft } from 'l
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { obtenerCarrito, quitarFoto, limpiarCarrito, CarritoItem } from '@/lib/carrito';
+import { WATERMARK_STYLE } from '@/lib/watermark';
 
 const PRECIO_INDIVIDUAL = 5.99;
 const PRECIO_PHOTOPASS = 11.99;
@@ -16,6 +17,8 @@ export default function CarritoPage() {
   const [plan, setPlan] = useState<'individual' | 'photopass'>('individual');
   const [procesando, setProcesando] = useState(false);
   const [logueado, setLogueado] = useState(false);
+  const [codigoPromo, setCodigoPromo] = useState('');
+  const [fotoAmpliada, setFotoAmpliada] = useState<CarritoItem | null>(null);
 
   useEffect(() => {
     setItems(obtenerCarrito());
@@ -26,6 +29,14 @@ export default function CarritoPage() {
     quitarFoto(foto_id);
     setItems(obtenerCarrito());
     toast.success('Foto eliminada del carrito');
+  };
+
+  // TODO: por ahora es solo visual. Para que funcione de verdad falta:
+  // una tabla de cupones en la base de datos, un endpoint que valide el
+  // código contra esa tabla, y aplicar el descuento real a `calcularTotal`.
+  const aplicarCodigo = () => {
+    if (!codigoPromo.trim()) return;
+    toast('Los códigos promocionales estarán disponibles próximamente', { icon: '🏷️' });
   };
 
   // Agrupar por evento
@@ -90,7 +101,7 @@ export default function CarritoPage() {
         </div>
       </nav>
 
-      <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '32px 24px' }}>
+      <div style={{ maxWidth: '1320px', margin: '0 auto', padding: '32px 24px' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '28px' }}>
@@ -115,7 +126,7 @@ export default function CarritoPage() {
             </Link>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '24px', alignItems: 'start' }}>
 
             {/* IZQUIERDA */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -189,17 +200,20 @@ export default function CarritoPage() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {items.map((item) => (
-                    <div key={item.foto_id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 14px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #f0f0f0' }}>
-                      <div style={{ width: '72px', height: '52px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, backgroundColor: '#e2e8f0' }}>
+                    <div key={item.foto_id} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 16px', backgroundColor: '#f8fafc', borderRadius: '14px', border: '1px solid #f0f0f0' }}>
+                      <div onClick={() => setFotoAmpliada(item)}
+                        style={{ position: 'relative', width: '160px', height: '110px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, backgroundColor: '#e2e8f0', cursor: 'pointer' }}>
                         <img src={item.foto_url} alt="foto"
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/72x52?text=Foto'; }} />
+                          onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/160x110?text=Foto'; }} />
+                        <div style={WATERMARK_STYLE} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <p style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {item.event_nombre}
                         </p>
-                        <p style={{ color: '#94a3b8', fontSize: '11px' }}>Archivo digital JPEG · HD</p>
+                        <p style={{ color: '#94a3b8', fontSize: '12px' }}>Archivo digital JPEG · HD</p>
+                        <p style={{ color: '#94a3b8', fontSize: '11px', marginTop: '4px' }}>Vista previa con marca de agua</p>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <p style={{ fontWeight: 800, color: '#0ea5e9', fontSize: '15px', marginBottom: '4px' }}>${PRECIO_INDIVIDUAL}</p>
@@ -216,6 +230,25 @@ export default function CarritoPage() {
 
             {/* DERECHA — Resumen */}
             <div style={{ position: 'sticky', top: '80px' }}>
+
+              {/* CÓDIGO PROMOCIONAL */}
+              <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '14px' }}>
+                  ¿Tienes algún código promocional?
+                </h3>
+                <input
+                  type="text"
+                  value={codigoPromo}
+                  onChange={(e) => setCodigoPromo(e.target.value)}
+                  placeholder="Código de descuento"
+                  style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '14px', color: '#0f172a', outline: 'none', boxSizing: 'border-box', marginBottom: '12px' }}
+                />
+                <button onClick={aplicarCodigo}
+                  style={{ width: '100%', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '12px', padding: '12px', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>
+                  Aplicar código
+                </button>
+              </div>
+
               <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0', marginBottom: '12px' }}>
                 <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '20px' }}>
                   Resumen del pedido
@@ -288,6 +321,29 @@ export default function CarritoPage() {
           </div>
         )}
       </div>
+
+      {/* MODAL FOTO AMPLIADA — siempre con marca de agua, igual que en la
+          galería del evento. La versión sin marca solo se entrega tras el
+          pago confirmado, nunca antes (ver lógica en `comprar`). */}
+      {fotoAmpliada && (
+        <div onClick={() => setFotoAmpliada(null)}
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ position: 'relative', maxWidth: '700px', width: '100%', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
+            <img src={fotoAmpliada.foto_url} alt="Vista previa"
+              style={{ width: '100%', display: 'block', maxHeight: '80vh', objectFit: 'contain', backgroundColor: '#000' }} />
+            <div style={WATERMARK_STYLE} />
+            <button onClick={() => setFotoAmpliada(null)}
+              style={{ position: 'absolute', top: '14px', right: '14px', width: '34px', height: '34px', backgroundColor: '#0f172a', color: 'white', border: 'none', borderRadius: '50%', fontSize: '16px', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30 }}>
+              ✕
+            </button>
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', padding: '20px 18px', zIndex: 20 }}>
+              <p style={{ color: 'white', fontWeight: 700, fontSize: '13px', margin: 0 }}>🔒 Vista previa con marca de agua</p>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', margin: 0 }}>Se entrega en HD sin marca tras confirmar el pago</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

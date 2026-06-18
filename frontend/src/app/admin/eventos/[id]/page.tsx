@@ -144,7 +144,7 @@ export default function AdminEventoFotosPage() {
   };
 
   if (cargando) return (
-    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#0f172a' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#16142a' }}>
       <AdminSidebar />
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <p style={{ color: 'rgba(255,255,255,0.4)' }}>Cargando...</p>
@@ -155,13 +155,13 @@ export default function AdminEventoFotosPage() {
   if (!evento) return null;
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#0f172a' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#16142a' }}>
       <AdminSidebar />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: '#16142a' }}>
 
         {/* TOPBAR */}
-        <div style={{ backgroundColor: '#1e293b', padding: '16px 28px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ backgroundColor: '#1d1a38', padding: '16px 28px', borderBottom: '1px solid rgba(165,180,252,0.1)' }}>
           <Link href="/admin" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'rgba(255,255,255,0.4)', textDecoration: 'none', fontSize: '13px', marginBottom: '12px' }}>
             <ArrowLeft size={14} /> Volver a galerías
           </Link>
@@ -183,7 +183,7 @@ export default function AdminEventoFotosPage() {
         </div>
 
         {/* GRID FOTOS */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', backgroundColor: '#16142a' }}>
           {fotos.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '80px', color: 'rgba(255,255,255,0.3)' }}>
               <Image size={48} style={{ margin: '0 auto 16px', display: 'block', opacity: 0.3 }} />
@@ -196,7 +196,7 @@ export default function AdminEventoFotosPage() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
               {fotos.map((foto) => (
-                <div key={foto.id} style={{ backgroundColor: '#1e293b', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div key={foto.id} style={{ backgroundColor: '#1d1a38', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(165,180,252,0.1)' }}>
                   <div style={{ position: 'relative', aspectRatio: '4/3', cursor: 'pointer' }} onClick={() => setFotoAmpliada(foto)}>
                     <img
                       src={foto.gcs_watermark_url || foto.gcs_original_url}

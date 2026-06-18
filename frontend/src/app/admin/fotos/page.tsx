@@ -57,13 +57,13 @@ export default function AdminFotosPage() {
   );
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#0f172a' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#16142a' }}>
       <AdminSidebar />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: '#16142a' }}>
 
         {/* TOPBAR */}
-        <div style={{ backgroundColor: '#1e293b', padding: '16px 28px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ backgroundColor: '#1d1a38', padding: '16px 28px', borderBottom: '1px solid rgba(165,180,252,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginBottom: '2px' }}>Panel admin</p>
             <h1 style={{ color: 'white', fontSize: '20px', fontWeight: 800 }}>Todas las fotos</h1>
@@ -85,11 +85,11 @@ export default function AdminFotosPage() {
         </div>
 
         {/* GRID */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', backgroundColor: '#16142a' }}>
           {cargando ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
               {[...Array(12)].map((_, i) => (
-                <div key={i} style={{ backgroundColor: '#1e293b', borderRadius: '14px', aspectRatio: '4/3' }} />
+                <div key={i} style={{ backgroundColor: '#1d1a38', borderRadius: '14px', aspectRatio: '4/3' }} />
               ))}
             </div>
           ) : filtradas.length === 0 ? (
@@ -106,9 +106,9 @@ export default function AdminFotosPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
               {filtradas.map((foto) => (
                 <div key={foto.id}
-                  style={{ backgroundColor: '#1e293b', borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', transition: 'border-color 0.2s' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(14,165,233,0.3)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.06)'; }}>
+                  style={{ backgroundColor: '#1d1a38', borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(165,180,252,0.1)', transition: 'border-color 0.2s' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(129,140,248,0.5)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(165,180,252,0.1)'; }}>
 
                   {/* Imagen */}
                   <div style={{ position: 'relative', aspectRatio: '4/3', backgroundColor: '#0f172a', cursor: 'pointer' }}

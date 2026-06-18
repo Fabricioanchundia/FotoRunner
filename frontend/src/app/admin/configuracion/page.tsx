@@ -43,16 +43,16 @@ export default function AdminConfiguracionPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#0f172a' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#16142a' }}>
       <AdminSidebar />
-      <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
+      <div style={{ flex: 1, padding: '32px', overflowY: 'auto', backgroundColor: '#16142a' }}>
         <div style={{ marginBottom: '24px' }}>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', marginBottom: '4px' }}>Panel admin</p>
           <h1 style={{ color: 'white', fontSize: '24px', fontWeight: 800 }}>Configuración</h1>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px' }}>Gestiona el estado de tus eventos</p>
         </div>
 
-        <div style={{ backgroundColor: '#1e293b', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: '24px' }}>
+        <div style={{ backgroundColor: '#1d1a38', borderRadius: '16px', border: '1px solid rgba(165,180,252,0.1)', overflow: 'hidden', marginBottom: '24px' }}>
           <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
             <h2 style={{ color: 'white', fontSize: '16px', fontWeight: 700 }}>Estado de eventos</h2>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginTop: '4px' }}>
