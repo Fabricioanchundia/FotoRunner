@@ -1,29 +1,18 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import sharp from 'sharp';
 import { verificarToken, soloAdmin } from '../middlewares/auth.middleware';
 import { responderExito, responderError } from '../utils/response';
+import { subirFotoCompleta } from '../services/storage.service';
 
 const router = Router();
 
-const uploadDir = path.join(process.cwd(), 'uploads');
-const watermarkDir = path.join(process.cwd(), 'uploads', 'watermarked');
-
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-if (!fs.existsSync(watermarkDir)) fs.mkdirSync(watermarkDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const nombre = `${Date.now()}-${Math.random().toString(36).slice(2)}${path.extname(file.originalname)}`;
-    cb(null, nombre);
-  }
-});
-
+// Almacenamiento EN MEMORIA — el archivo nunca se escribe en disco local.
+// Esto es necesario para producción: el contenedor/servidor puede
+// reiniciarse o redeployarse sin perder fotos, porque nada vive en su
+// propio disco efímero. Todo va directo a Google Cloud Storage.
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const tipos = ['image/jpeg', 'image/png', 'image/webp'];
@@ -32,14 +21,14 @@ const upload = multer({
   }
 });
 
-// Genera marca de agua con texto FOTORUNNER
-const generarMarcaAgua = async (inputPath: string, outputPath: string): Promise<void> => {
-  const imagen = sharp(inputPath);
+// Genera un buffer con marca de agua con texto FOTORUNNER, a partir del
+// buffer original en memoria (sin pasar por disco).
+const generarMarcaAguaBuffer = async (bufferOriginal: Buffer): Promise<Buffer> => {
+  const imagen = sharp(bufferOriginal);
   const metadata = await imagen.metadata();
   const width = metadata.width || 800;
   const height = metadata.height || 600;
 
-  // SVG con texto diagonal repetido como marca de agua
   const margen = 120;
   const textos: string[] = [];
 
@@ -65,7 +54,7 @@ const generarMarcaAgua = async (inputPath: string, outputPath: string): Promise<
     </svg>
   `;
 
-  await imagen
+  return imagen
     .composite([{
       input: Buffer.from(svgMarca),
       top: 0,
@@ -73,7 +62,22 @@ const generarMarcaAgua = async (inputPath: string, outputPath: string): Promise<
       blend: 'over'
     }])
     .jpeg({ quality: 85 })
-    .toFile(outputPath);
+    .toBuffer();
+};
+
+// Procesa un archivo individual: genera su marca de agua y lo sube a
+// ambos buckets. Reutilizada tanto por /foto (una sola) como por
+// /fotos (varias a la vez).
+const procesarYSubirArchivo = async (file: Express.Multer.File) => {
+  const nombreBase = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+  const bufferWatermark = await generarMarcaAguaBuffer(file.buffer);
+  const { urlPublica, pathPrivado } = await subirFotoCompleta(
+    file.buffer,
+    bufferWatermark,
+    nombreBase,
+    file.mimetype
+  );
+  return { url: pathPrivado, url_watermark: urlPublica };
 };
 
 router.post(
@@ -87,31 +91,38 @@ router.post(
       return;
     }
 
-    const BASE_URL = process.env['BACKEND_URL'] || 'http://localhost:3001';
-    const urlOriginal = `${BASE_URL}/uploads/${req.file.filename}`;
+    try {
+      const resultado = await procesarYSubirArchivo(req.file);
+      responderExito(res, resultado, 'Foto subida exitosamente a la nube');
+    } catch (err) {
+      console.error('Error al subir foto a la nube:', err);
+      responderError(res, 'Error al subir la foto. Intenta de nuevo.', 500);
+    }
+  }
+);
+
+// Subida múltiple — hasta 30 fotos en una sola petición. Cada archivo
+// se procesa en paralelo (marca de agua + subida a ambos buckets).
+router.post(
+  '/fotos',
+  verificarToken,
+  soloAdmin,
+  upload.array('fotos', 30),
+  async (req: Request, res: Response): Promise<void> => {
+    const files = req.files as Express.Multer.File[] | undefined;
+    if (!files || files.length === 0) {
+      responderError(res, 'No se recibió ningún archivo', 400);
+      return;
+    }
 
     try {
-      // Generar versión con marca de agua
-      const watermarkFilename = `wm_${req.file.filename}`;
-      const watermarkPath = path.join(watermarkDir, watermarkFilename);
-
-      await generarMarcaAgua(req.file.path, watermarkPath);
-
-      const urlWatermark = `${BASE_URL}/uploads/watermarked/${watermarkFilename}`;
-
-      responderExito(res, {
-        url: urlOriginal,
-        url_watermark: urlWatermark,
-        tamano_bytes: req.file.size
-      }, 'Foto subida exitosamente');
+      const resultados = await Promise.all(
+        files.map((file) => procesarYSubirArchivo(file))
+      );
+      responderExito(res, resultados, `${resultados.length} fotos subidas exitosamente a la nube`);
     } catch (err) {
-      // Si falla la marca de agua, devolver solo la original
-      console.error('Error generando marca de agua:', err);
-      responderExito(res, {
-        url: urlOriginal,
-        url_watermark: urlOriginal,
-        tamano_bytes: req.file.size
-      }, 'Foto subida (sin marca de agua)');
+      console.error('Error al subir fotos a la nube:', err);
+      responderError(res, 'Error al subir las fotos. Intenta de nuevo.', 500);
     }
   }
 );

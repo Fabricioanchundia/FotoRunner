@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { LogOut, ShoppingBag, Camera, RotateCcw, CheckCircle, Shield, Mail, Phone, MapPin, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import LoadingScreen from '@/components/LoadingScreen';
 
 interface Usuario {
   id: string;
@@ -154,11 +155,7 @@ export default function PerfilPage() {
 
   const cerrarSesion = () => { localStorage.removeItem('token'); router.push('/'); };
 
-  if (cargando) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' }}>
-      <p style={{ color: '#64748b' }}>Cargando...</p>
-    </div>
-  );
+  if (cargando) return <LoadingScreen variant="cliente" />;
 
   if (!usuario) return null;
 

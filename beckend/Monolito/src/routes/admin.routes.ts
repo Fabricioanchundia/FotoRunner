@@ -3,7 +3,7 @@ import { verificarToken, soloAdmin } from '../middlewares/auth.middleware';
 import {
   obtenerStats, listarUsuarios, listarTodasFotos,
   eliminarFotoAdmin, cambiarRolUsuario, cambiarStatusEvento,
-  actualizarPreciosEvento, asignarHelper, revocarHelper
+  actualizarPreciosEvento, actualizarEventoCompleto, asignarHelper, revocarHelper
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -19,5 +19,6 @@ router.post('/usuarios/:id/helper', asignarHelper);
 router.delete('/usuarios/:id/helper', revocarHelper);
 router.patch('/eventos/:id/status', cambiarStatusEvento);
 router.patch('/eventos/:id/precios', actualizarPreciosEvento);
+router.patch('/eventos/:id', actualizarEventoCompleto);
 
 export default router;

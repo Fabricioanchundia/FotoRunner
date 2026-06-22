@@ -10,7 +10,11 @@ const MS_FACIAL_URL = process.env['MS_FACIAL_URL'] || 'http://localhost:3002';
 
 const schemaSubirFoto = z.object({
   event_id: z.string().min(1, 'El ID del evento es requerido'),
-  gcs_original_url: z.string().url('URL inválida'),
+  // gcs_original_url ya no es necesariamente una URL completa: desde la
+  // migración a Cloud Storage, es el PATH interno dentro del bucket
+  // privado (ej. "originales/123.jpg"), usado luego para generar Signed
+  // URLs tras el pago. Solo se exige que no esté vacío.
+  gcs_original_url: z.string().min(1, 'La referencia de la foto es requerida'),
   gcs_watermark_url: z.string().url('URL inválida').optional()
 });
 
@@ -118,21 +122,17 @@ export const subirFoto = async (
       }
     });
 
-    // La portada siempre se actualiza con la foto más reciente subida. El
-    // admin puede sobreescribirla en cualquier momento eligiendo otra foto
-    // específica como portada con el botón "Usar como portada".
-    await prisma.event.update({
-      where: { id: evento.id },
-      data: { cover_url: foto.gcs_watermark_url ?? foto.gcs_original_url }
-    });
-
-    // Notificar al ms-facial en background — no bloquea la respuesta
+    // Notificar al ms-facial en background — no bloquea la respuesta.
+    // IMPORTANTE: se manda la URL PÚBLICA con marca de agua, no
+    // gcs_original_url (que ahora es solo un path interno del bucket
+    // privado, no una URL navegable que Cloud Vision pueda descargar).
+    const urlParaDeteccion = foto.gcs_watermark_url || foto.gcs_original_url;
     fetch(`${MS_FACIAL_URL}/api/facial/procesar-foto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         photo_id: foto.id,
-        photo_url: foto.gcs_original_url
+        photo_url: urlParaDeteccion
       })
     }).catch(err => logger.warn(`MS-Facial procesar-foto error: ${err}`));
 
@@ -141,6 +141,83 @@ export const subirFoto = async (
   } catch (error) {
     logger.error(`Error al subir foto: ${error}`);
     responderError(res, 'Error al subir foto', 500);
+  }
+};
+
+const schemaSubirFotosMultiple = z.object({
+  event_id: z.string().min(1, 'El ID del evento es requerido'),
+  fotos: z.array(z.object({
+    gcs_original_url: z.string().min(1),
+    gcs_watermark_url: z.string().url().optional()
+  })).min(1, 'Debes incluir al menos una foto')
+});
+
+// Registra varias fotos de una sola vez (ya subidas previamente al
+// almacenamiento vía POST /api/upload/fotos). Reutiliza la misma
+// validación de evento/permisos que subirFoto, una sola vez para todo
+// el lote en vez de repetirla por cada foto.
+export const subirFotosMultiple = async (
+  req: RequestAutenticado,
+  res: Response
+): Promise<void> => {
+  try {
+    const datos = schemaSubirFotosMultiple.safeParse(req.body);
+    if (!datos.success) {
+      responderError(res, 'Datos inválidos', 400, datos.error.issues);
+      return;
+    }
+
+    const evento = await prisma.event.findUnique({
+      where: { id: datos.data.event_id }
+    });
+
+    if (!evento) {
+      responderError(res, 'Evento no encontrado', 404);
+      return;
+    }
+
+    if (evento.admin_id !== req.usuario!.id && req.usuario?.role !== 'ADMIN') {
+      responderError(res, 'Solo el admin del evento puede subir fotos', 403);
+      return;
+    }
+
+    const fotosCreadas = await prisma.$transaction(
+      datos.data.fotos.map((f) =>
+        prisma.photo.create({
+          data: {
+            event_id: datos.data.event_id,
+            gcs_original_url: f.gcs_original_url,
+            gcs_watermark_url: f.gcs_watermark_url ?? null
+          }
+        })
+      )
+    );
+
+    // La portada se actualiza con la última foto del lote, igual que en
+    // la subida individual.
+    const ultima = fotosCreadas[fotosCreadas.length - 1];
+    if (ultima) {
+      await prisma.event.update({
+        where: { id: evento.id },
+        data: { cover_url: ultima.gcs_watermark_url ?? ultima.gcs_original_url }
+      });
+    }
+
+    // Notificar a ms-facial por cada foto, en background, sin bloquear.
+    for (const foto of fotosCreadas) {
+      const urlParaDeteccion = foto.gcs_watermark_url || foto.gcs_original_url;
+      fetch(`${MS_FACIAL_URL}/api/facial/procesar-foto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo_id: foto.id, photo_url: urlParaDeteccion })
+      }).catch(err => logger.warn(`MS-Facial procesar-foto error: ${err}`));
+    }
+
+    logger.info(`${fotosCreadas.length} fotos subidas al evento ${datos.data.event_id}`);
+    responderExito(res, fotosCreadas, `${fotosCreadas.length} fotos subidas exitosamente`, 201);
+  } catch (error) {
+    logger.error(`Error al subir fotos múltiples: ${error}`);
+    responderError(res, 'Error al subir las fotos', 500);
   }
 };
 

@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import AdminSidebar from '@/components/AdminSidebar';
+import LoadingScreen from '@/components/LoadingScreen';
 import api from '@/lib/api';
 
 interface Stats {
@@ -24,11 +25,15 @@ export default function AdminMonitorPage() {
 
   const tarjetas = stats ? [
     { label: 'Usuarios registrados', valor: stats.totalUsuarios, emoji: '👥', color: '#3b82f6' },
-    { label: 'Eventos creados', valor: stats.totalEventos, emoji: '🏃', color: '#FF6B00' },
+    { label: 'Eventos creados', valor: stats.totalEventos, emoji: '🏃', color: '#818cf8' },
     { label: 'Fotos subidas', valor: stats.totalFotos, emoji: '📸', color: '#8b5cf6' },
     { label: 'Ventas completadas', valor: stats.totalOrdenes, emoji: '🛒', color: '#22c55e' },
     { label: 'Ingresos totales', valor: `$${stats.ingresoTotal.toFixed(2)}`, emoji: '💰', color: '#f59e0b' },
   ] : [];
+
+  if (cargando) {
+    return <LoadingScreen variant="admin" />;
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#16142a' }}>

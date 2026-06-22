@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Plus, Calendar, MapPin, Image, Upload,
-  LayoutDashboard, Camera, Users,
+  LayoutDashboard, Camera, Users, Pencil,
   Filter, Search, DollarSign, TrendingUp, Eye, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -19,7 +19,6 @@ interface Evento {
   tipo: string;
   status: string;
   cover_url: string | null;
-  disponible_hasta?: string | null;
   precio_individual: number;
   precio_photopass: number;
   _count: { fotos: number };
@@ -46,26 +45,33 @@ export default function AdminPage() {
   const [creando, setCreando] = useState(false);
   const [form, setForm] = useState({
     nombre: '', ciudad: '', fecha: '', tipo: 'RUNNING',
-    descripcion: '', cover_url: '', disponible_hasta: '',
+    descripcion: '', cover_url: '',
     precio_individual: '5.99', precio_photopass: '11.99'
   });
 
   // Modal subir foto
   const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(null);
   const [mostrarSubirFoto, setMostrarSubirFoto] = useState(false);
+  const [modoSubida, setModoSubida] = useState<'una' | 'varias'>('una');
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [archivoFoto, setArchivoFoto] = useState<File | null>(null);
   const [previewFoto, setPreviewFoto] = useState('');
+  const [archivosVarios, setArchivosVarios] = useState<File[]>([]);
+  const [progresoVarios, setProgresoVarios] = useState({ actual: 0, total: 0 });
   const [urlFoto, setUrlFoto] = useState('');
   const [urlWatermark, setUrlWatermark] = useState('');
   const [fotosSubidas, setFotosSubidas] = useState(0);
 
-  // Modal precios
-  const [mostrarPrecios, setMostrarPrecios] = useState(false);
-  const [eventoPrecios, setEventoPrecios] = useState<Evento | null>(null);
-  const [precioInd, setPrecioInd] = useState('');
-  const [precioPass, setPrecioPass] = useState('');
-  const [guardandoPrecios, setGuardandoPrecios] = useState(false);
+  // Modal editar evento (nombre, ciudad, fecha, tipo, portada, precios — todo junto)
+  const [mostrarEditar, setMostrarEditar] = useState(false);
+  const [eventoEditar, setEventoEditar] = useState<Evento | null>(null);
+  const [formEditar, setFormEditar] = useState({
+    nombre: '', ciudad: '', fecha: '', tipo: 'RUNNING',
+    cover_url: '', precio_individual: '', precio_photopass: ''
+  });
+  const [fotosEventoEditar, setFotosEventoEditar] = useState<{ id: string; gcs_watermark_url: string | null; gcs_original_url: string }[]>([]);
+  const [cargandoFotosEditar, setCargandoFotosEditar] = useState(false);
+  const [guardandoEditar, setGuardandoEditar] = useState(false);
 
   useEffect(() => { cargarTodo(); }, []);
 
@@ -91,15 +97,12 @@ export default function AdminPage() {
       await api.post('/eventos', {
         ...form,
         fecha: new Date(form.fecha).toISOString(),
-        ...(form.disponible_hasta
-          ? { disponible_hasta: new Date(form.disponible_hasta).toISOString() }
-          : { disponible_hasta: undefined }),
         precio_individual: Number(form.precio_individual),
         precio_photopass: Number(form.precio_photopass)
       });
       toast.success('Evento creado exitosamente');
       setMostrarForm(false);
-      setForm({ nombre: '', ciudad: '', fecha: '', tipo: 'RUNNING', descripcion: '', cover_url: '', disponible_hasta: '', precio_individual: '5.99', precio_photopass: '11.99' });
+      setForm({ nombre: '', ciudad: '', fecha: '', tipo: 'RUNNING', descripcion: '', cover_url: '', precio_individual: '5.99', precio_photopass: '11.99' });
       cargarTodo();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { mensaje?: string } } };
@@ -116,6 +119,21 @@ export default function AdminPage() {
     setPreviewFoto(URL.createObjectURL(file));
     setUrlFoto('');
     setUrlWatermark('');
+  };
+
+  const manejarArchivosVarios = (files: FileList) => {
+    const validos: File[] = [];
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) { toast.error(`${file.name}: solo imágenes`); continue; }
+      if (file.size > 10 * 1024 * 1024) { toast.error(`${file.name}: máximo 10MB`); continue; }
+      validos.push(file);
+    }
+    if (validos.length === 0) return;
+    setArchivosVarios(prev => [...prev, ...validos]);
+  };
+
+  const quitarArchivoVarios = (index: number) => {
+    setArchivosVarios(prev => prev.filter((_, i) => i !== index));
   };
 
   const subirFoto = async (e: React.FormEvent) => {
@@ -155,6 +173,7 @@ export default function AdminPage() {
       setUrlFoto('');
       setUrlWatermark('');
       toast.success('¡Foto subida con marca de agua!');
+      setMostrarSubirFoto(false);
       cargarTodo();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { mensaje?: string } } };
@@ -164,27 +183,102 @@ export default function AdminPage() {
     }
   };
 
-  const guardarPrecios = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!eventoPrecios) return;
-    setGuardandoPrecios(true);
+  const subirFotosVarias = async () => {
+    if (!eventoSeleccionado || archivosVarios.length === 0) return;
+    setSubiendoFoto(true);
+    setProgresoVarios({ actual: 0, total: archivosVarios.length });
     try {
-      await api.patch(`/admin/eventos/${eventoPrecios.id}/precios`, {
-        precio_individual: Number(precioInd),
-        precio_photopass: Number(precioPass)
+      const formData = new FormData();
+      archivosVarios.forEach((file) => formData.append('fotos', file));
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:3001/api/upload/fotos', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
       });
-      toast.success('Precios actualizados');
-      setMostrarPrecios(false);
+      const data = await res.json();
+      if (!data.exito) throw new Error(data.mensaje);
+
+      setProgresoVarios({ actual: archivosVarios.length, total: archivosVarios.length });
+
+      await api.post('/fotos/multiple', {
+        event_id: eventoSeleccionado.id,
+        fotos: data.datos.map((r: { url: string; url_watermark: string }) => ({
+          gcs_original_url: r.url,
+          gcs_watermark_url: r.url_watermark
+        }))
+      });
+
+      setFotosSubidas(prev => prev + archivosVarios.length);
+      setArchivosVarios([]);
+      toast.success(`¡${archivosVarios.length} fotos subidas con marca de agua!`);
+      setMostrarSubirFoto(false);
       cargarTodo();
-    } catch { toast.error('Error al actualizar precios'); }
-    finally { setGuardandoPrecios(false); }
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { mensaje?: string } } };
+      toast.error(error.response?.data?.mensaje || 'Error al subir las fotos');
+    } finally {
+      setSubiendoFoto(false);
+      setProgresoVarios({ actual: 0, total: 0 });
+    }
   };
 
-  const abrirPrecios = (evento: Evento) => {
-    setEventoPrecios(evento);
-    setPrecioInd(String(evento.precio_individual || 5.99));
-    setPrecioPass(String(evento.precio_photopass || 11.99));
-    setMostrarPrecios(true);
+  const abrirEditar = async (evento: Evento) => {
+    setEventoEditar(evento);
+    const fechaLocal = new Date(evento.fecha);
+    fechaLocal.setMinutes(fechaLocal.getMinutes() - fechaLocal.getTimezoneOffset());
+    setFormEditar({
+      nombre: evento.nombre,
+      ciudad: evento.ciudad,
+      fecha: fechaLocal.toISOString().slice(0, 16),
+      tipo: evento.tipo,
+      cover_url: evento.cover_url || '',
+      precio_individual: String(evento.precio_individual || 5.99),
+      precio_photopass: String(evento.precio_photopass || 11.99)
+    });
+    setMostrarEditar(true);
+    setCargandoFotosEditar(true);
+    try {
+      const { data } = await api.get(`/fotos/evento/${evento.id}`);
+      setFotosEventoEditar(data.datos);
+    } catch {
+      // Si fallan las fotos no bloqueamos el resto del formulario —
+      // simplemente no se muestran miniaturas de portada disponibles.
+      setFotosEventoEditar([]);
+    } finally {
+      setCargandoFotosEditar(false);
+    }
+  };
+
+  const cerrarEditar = () => {
+    setMostrarEditar(false);
+    setEventoEditar(null);
+    setFotosEventoEditar([]);
+  };
+
+  const guardarEditar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eventoEditar) return;
+    setGuardandoEditar(true);
+    try {
+      await api.patch(`/admin/eventos/${eventoEditar.id}`, {
+        nombre: formEditar.nombre,
+        ciudad: formEditar.ciudad,
+        fecha: new Date(formEditar.fecha).toISOString(),
+        tipo: formEditar.tipo,
+        cover_url: formEditar.cover_url || null,
+        precio_individual: Number(formEditar.precio_individual),
+        precio_photopass: Number(formEditar.precio_photopass)
+      });
+      toast.success('Evento actualizado exitosamente');
+      cerrarEditar();
+      cargarTodo();
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { mensaje?: string } } };
+      toast.error(error.response?.data?.mensaje || 'Error al actualizar el evento');
+    } finally {
+      setGuardandoEditar(false);
+    }
   };
 
   const cambiarStatus = async (eventoId: string, status: string) => {
@@ -197,8 +291,10 @@ export default function AdminPage() {
 
   const cerrarModalFoto = () => {
     setMostrarSubirFoto(false);
+    setModoSubida('una');
     setArchivoFoto(null);
     setPreviewFoto('');
+    setArchivosVarios([]);
     setUrlFoto('');
     setUrlWatermark('');
   };
@@ -349,9 +445,9 @@ export default function AdminPage() {
                           style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', border: 'none', borderRadius: '8px', color: 'white', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
                           <Upload size={11} /> Subir
                         </button>
-                        <button onClick={() => abrirPrecios(evento)}
+                        <button onClick={() => abrirEditar(evento)}
                           style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', backgroundColor: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)', borderRadius: '8px', color: '#c4b5fd', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
-                          <DollarSign size={11} /> Precios
+                          <Pencil size={11} /> Editar
                         </button>
                         <select value={evento.status} onChange={(e) => cambiarStatus(evento.id, e.target.value)}
                           style={{ padding: '6px 8px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.6)', fontSize: '11px', cursor: 'pointer', outline: 'none' }}>
@@ -384,7 +480,6 @@ export default function AdminPage() {
                 { label: 'Nombre del evento', key: 'nombre', type: 'text', placeholder: 'Half Marathon Manta 2026', required: true },
                 { label: 'Ciudad', key: 'ciudad', type: 'text', placeholder: 'Manta', required: true },
                 { label: 'Fecha del evento', key: 'fecha', type: 'datetime-local', placeholder: '', required: true },
-                { label: 'Disponible hasta (opcional)', key: 'disponible_hasta', type: 'datetime-local', placeholder: '', required: false },
                 { label: 'URL de portada (opcional)', key: 'cover_url', type: 'url', placeholder: 'https://...', required: false },
               ].map((campo) => (
                 <div key={campo.key} style={{ marginBottom: '14px' }}>
@@ -457,103 +552,229 @@ export default function AdminPage() {
                 <X size={20} />
               </button>
             </div>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '8px' }}>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '16px' }}>
               {eventoSeleccionado.nombre}
             </p>
+
+            {/* PESTAÑAS Subir una / Subir varias */}
+            <div style={{ display: 'flex', gap: '6px', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: '10px', padding: '4px', marginBottom: '16px' }}>
+              <button type="button" onClick={() => setModoSubida('una')}
+                style={{ flex: 1, padding: '9px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 700, backgroundColor: modoSubida === 'una' ? 'rgba(99,102,241,0.18)' : 'transparent', color: modoSubida === 'una' ? '#a5b4fc' : 'rgba(255,255,255,0.4)' }}>
+                Subir una
+              </button>
+              <button type="button" onClick={() => setModoSubida('varias')}
+                style={{ flex: 1, padding: '9px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 700, backgroundColor: modoSubida === 'varias' ? 'rgba(99,102,241,0.18)' : 'transparent', color: modoSubida === 'varias' ? '#a5b4fc' : 'rgba(255,255,255,0.4)' }}>
+                Subir varias
+              </button>
+            </div>
+
             <div style={{ backgroundColor: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '8px', padding: '8px 12px', marginBottom: '16px' }}>
               <p style={{ color: '#38bdf8', fontSize: '12px', fontWeight: 600 }}>
                 🔒 La marca de agua se genera automáticamente al subir el archivo
               </p>
             </div>
-            <form onSubmit={subirFoto}>
-              <div
-                onClick={() => document.getElementById('inputFotoAdmin')?.click()}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) manejarArchivo(f); }}
-                style={{ border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '14px', padding: '28px', textAlign: 'center', cursor: 'pointer', marginBottom: '16px', backgroundColor: 'rgba(255,255,255,0.02)' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = '#0ea5e9'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.1)'; }}>
-                <input id="inputFotoAdmin" type="file" accept="image/*" style={{ display: 'none' }}
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) manejarArchivo(f); }} />
-                {previewFoto ? (
-                  <img src={previewFoto} alt="preview" style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '10px' }} />
-                ) : (
-                  <>
-                    <Upload size={28} color="rgba(255,255,255,0.3)" style={{ margin: '0 auto 10px', display: 'block' }} />
-                    <p style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>Arrastra aquí o clic para seleccionar</p>
-                    <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>JPG, PNG, WEBP · máx 10MB</p>
-                  </>
-                )}
-              </div>
 
-              {archivoFoto && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>📁 {archivoFoto.name}</span>
-                  <button type="button" onClick={() => { setArchivoFoto(null); setPreviewFoto(''); setUrlWatermark(''); }}
-                    style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+            {modoSubida === 'una' ? (
+              <form onSubmit={subirFoto}>
+                <div
+                  onClick={() => document.getElementById('inputFotoAdmin')?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) manejarArchivo(f); }}
+                  style={{ border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '14px', padding: '28px', textAlign: 'center', cursor: 'pointer', marginBottom: '16px', backgroundColor: 'rgba(255,255,255,0.02)' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = '#0ea5e9'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.1)'; }}>
+                  <input id="inputFotoAdmin" type="file" accept="image/*" style={{ display: 'none' }}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) manejarArchivo(f); }} />
+                  {previewFoto ? (
+                    <img src={previewFoto} alt="preview" style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '10px' }} />
+                  ) : (
+                    <>
+                      <Upload size={28} color="rgba(255,255,255,0.3)" style={{ margin: '0 auto 10px', display: 'block' }} />
+                      <p style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>Arrastra aquí o clic para seleccionar</p>
+                      <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>JPG, PNG, WEBP · máx 10MB</p>
+                    </>
+                  )}
                 </div>
-              )}
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-                <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
-                <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>o ingresa URL</span>
-                <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+                {archivoFoto && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>📁 {archivoFoto.name}</span>
+                    <button type="button" onClick={() => { setArchivoFoto(null); setPreviewFoto(''); setUrlWatermark(''); }}
+                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+                  <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>o ingresa URL</span>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+                </div>
+
+                <input type="url" value={urlFoto}
+                  onChange={(e) => { setUrlFoto(e.target.value); if (e.target.value) { setArchivoFoto(null); setPreviewFoto(''); } }}
+                  placeholder="https://..."
+                  style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box', marginBottom: '16px' }} />
+
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button type="button" onClick={cerrarModalFoto}
+                    style={{ flex: 1, border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={subiendoFoto || (!archivoFoto && !urlFoto)}
+                    style={{ flex: 1, background: subiendoFoto || (!archivoFoto && !urlFoto) ? '#334155' : 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+                    {subiendoFoto ? 'Subiendo...' : '+ Subir foto'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <div
+                  onClick={() => document.getElementById('inputFotosVariasAdmin')?.click()}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files.length) manejarArchivosVarios(e.dataTransfer.files); }}
+                  style={{ border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '14px', padding: '28px', textAlign: 'center', cursor: 'pointer', marginBottom: '14px', backgroundColor: 'rgba(255,255,255,0.02)' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = '#0ea5e9'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.1)'; }}>
+                  <input id="inputFotosVariasAdmin" type="file" accept="image/*" multiple style={{ display: 'none' }}
+                    onChange={(e) => { if (e.target.files?.length) manejarArchivosVarios(e.target.files); e.target.value = ''; }} />
+                  <Upload size={28} color="rgba(255,255,255,0.3)" style={{ margin: '0 auto 10px', display: 'block' }} />
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>Arrastra aquí o clic para seleccionar varias</p>
+                  <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>JPG, PNG, WEBP · máx 10MB cada una</p>
+                </div>
+
+                {archivosVarios.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px', maxHeight: '180px', overflowY: 'auto' }}>
+                    {archivosVarios.map((file, i) => (
+                      <div key={`${file.name}-${i}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '8px 12px' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>📁 {file.name}</span>
+                        <button type="button" onClick={() => quitarArchivoVarios(i)}
+                          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '14px', marginLeft: '8px' }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {subiendoFoto && progresoVarios.total > 0 && (
+                  <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginBottom: '12px', textAlign: 'center' }}>
+                    Subiendo {progresoVarios.actual} de {progresoVarios.total}...
+                  </p>
+                )}
+
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button type="button" onClick={cerrarModalFoto}
+                    style={{ flex: 1, border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
+                    Cancelar
+                  </button>
+                  <button type="button" onClick={subirFotosVarias} disabled={subiendoFoto || archivosVarios.length === 0}
+                    style={{ flex: 1, background: subiendoFoto || archivosVarios.length === 0 ? '#334155' : 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+                    {subiendoFoto ? 'Subiendo...' : `+ Subir ${archivosVarios.length || ''} fotos`}
+                  </button>
+                </div>
               </div>
-
-              <input type="url" value={urlFoto}
-                onChange={(e) => { setUrlFoto(e.target.value); if (e.target.value) { setArchivoFoto(null); setPreviewFoto(''); } }}
-                placeholder="https://..."
-                style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box', marginBottom: '16px' }} />
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button type="button" onClick={cerrarModalFoto}
-                  style={{ flex: 1, border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
-                  Cancelar
-                </button>
-                <button type="submit" disabled={subiendoFoto || (!archivoFoto && !urlFoto)}
-                  style={{ flex: 1, background: subiendoFoto || (!archivoFoto && !urlFoto) ? '#334155' : 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
-                  {subiendoFoto ? 'Subiendo...' : '+ Subir foto'}
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
       )}
 
-      {/* MODAL PRECIOS */}
-      {mostrarPrecios && eventoPrecios && (
+      {/* MODAL EDITAR EVENTO — nombre, ciudad, fecha, tipo, portada y precios juntos */}
+      {mostrarEditar && eventoEditar && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ backgroundColor: '#1e293b', borderRadius: '20px', padding: '32px', width: '100%', maxWidth: '420px', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ backgroundColor: '#1e293b', borderRadius: '20px', padding: '32px', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'white' }}>Editar precios</h2>
-              <button onClick={() => setMostrarPrecios(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: 'white' }}>Editar evento</h2>
+              <button onClick={cerrarEditar} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px' }}>{eventoPrecios.nombre}</p>
-            <form onSubmit={guardarPrecios}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginBottom: '24px' }}>{eventoEditar.nombre}</p>
+
+            <form onSubmit={guardarEditar}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                 <div>
-                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>Individual ($)</label>
-                  <input type="number" step="0.01" min="0.99" required value={precioInd}
-                    onChange={(e) => setPrecioInd(e.target.value)}
-                    style={{ width: '100%', backgroundColor: 'rgba(14,165,233,0.1)', border: '2px solid rgba(14,165,233,0.3)', borderRadius: '12px', padding: '12px', fontSize: '22px', fontWeight: 900, color: '#38bdf8', outline: 'none', boxSizing: 'border-box', textAlign: 'center' }} />
+                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Nombre</label>
+                  <input type="text" required value={formEditar.nombre}
+                    onChange={(e) => setFormEditar({ ...formEditar, nombre: e.target.value })}
+                    style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>Photopass ($)</label>
-                  <input type="number" step="0.01" min="0.99" required value={precioPass}
-                    onChange={(e) => setPrecioPass(e.target.value)}
-                    style={{ width: '100%', backgroundColor: 'rgba(99,102,241,0.1)', border: '2px solid rgba(99,102,241,0.3)', borderRadius: '12px', padding: '12px', fontSize: '22px', fontWeight: 900, color: '#a78bfa', outline: 'none', boxSizing: 'border-box', textAlign: 'center' }} />
+                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Ciudad</label>
+                  <input type="text" required value={formEditar.ciudad}
+                    onChange={(e) => setFormEditar({ ...formEditar, ciudad: e.target.value })}
+                    style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }} />
                 </div>
               </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Fecha</label>
+                  <input type="datetime-local" required value={formEditar.fecha}
+                    onChange={(e) => setFormEditar({ ...formEditar, fecha: e.target.value })}
+                    style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Tipo</label>
+                  <select value={formEditar.tipo} onChange={(e) => setFormEditar({ ...formEditar, tipo: e.target.value })}
+                    style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }}>
+                    <option value="RUNNING">Running</option>
+                    <option value="ATLETISMO">Atletismo</option>
+                    <option value="CICLISMO">Ciclismo</option>
+                    <option value="TRIATHLON">Triatlón</option>
+                    <option value="TRAIL">Trail</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>Portada</label>
+                {cargandoFotosEditar ? (
+                  <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>Cargando fotos del evento...</p>
+                ) : fotosEventoEditar.length === 0 ? (
+                  <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>Este evento aún no tiene fotos subidas para elegir portada.</p>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '8px', maxHeight: '220px', overflowY: 'auto', padding: '4px' }}>
+                    {fotosEventoEditar.map((foto) => {
+                      const url = foto.gcs_watermark_url || foto.gcs_original_url;
+                      const seleccionada = formEditar.cover_url === url;
+                      return (
+                        <button key={foto.id} type="button" onClick={() => setFormEditar({ ...formEditar, cover_url: url })}
+                          style={{ position: 'relative', padding: 0, border: seleccionada ? '3px solid #a78bfa' : '3px solid transparent', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', aspectRatio: '1/1', backgroundColor: '#0f172a' }}>
+                          <img src={url} alt="Foto del evento" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                          {seleccionada && (
+                            <div style={{ position: 'absolute', top: '4px', right: '4px', width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#a78bfa', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 800 }}>✓</div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '24px' }}>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase' }}>Precios</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '8px' }}>Individual ($)</label>
+                    <input type="number" step="0.01" min="0.99" required value={formEditar.precio_individual}
+                      onChange={(e) => setFormEditar({ ...formEditar, precio_individual: e.target.value })}
+                      style={{ width: '100%', backgroundColor: 'rgba(14,165,233,0.1)', border: '2px solid rgba(14,165,233,0.3)', borderRadius: '12px', padding: '12px', fontSize: '20px', fontWeight: 900, color: '#38bdf8', outline: 'none', boxSizing: 'border-box', textAlign: 'center' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '8px' }}>Photopass ($)</label>
+                    <input type="number" step="0.01" min="0.99" required value={formEditar.precio_photopass}
+                      onChange={(e) => setFormEditar({ ...formEditar, precio_photopass: e.target.value })}
+                      style={{ width: '100%', backgroundColor: 'rgba(99,102,241,0.1)', border: '2px solid rgba(99,102,241,0.3)', borderRadius: '12px', padding: '12px', fontSize: '20px', fontWeight: 900, color: '#a78bfa', outline: 'none', boxSizing: 'border-box', textAlign: 'center' }} />
+                  </div>
+                </div>
+              </div>
+
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button type="button" onClick={() => setMostrarPrecios(false)}
+                <button type="button" onClick={cerrarEditar}
                   style={{ flex: 1, border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
                   Cancelar
                 </button>
-                <button type="submit" disabled={guardandoPrecios}
-                  style={{ flex: 2, background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
-                  {guardandoPrecios ? 'Guardando...' : 'Guardar precios'}
+                <button type="submit" disabled={guardandoEditar}
+                  style={{ flex: 2, background: guardandoEditar ? '#334155' : 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+                  {guardandoEditar ? 'Guardando...' : 'Guardar cambios'}
                 </button>
               </div>
             </form>

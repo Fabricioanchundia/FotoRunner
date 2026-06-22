@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { agregarFoto, quitarFoto, estaEnCarrito, contarItems } from '@/lib/carrito';
 import { WATERMARK_STYLE } from '@/lib/watermark';
+import LoadingScreen from '@/components/LoadingScreen';
 
 interface Evento {
   id: string;
@@ -207,11 +208,7 @@ export default function EventoPage() {
     setFotoAmpliada(fotos[siguienteIndice]);
   };
 
-  if (cargando) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'white' }}>
-      <p style={{ color: '#64748b' }}>Cargando...</p>
-    </div>
-  );
+  if (cargando) return <LoadingScreen variant="cliente" />;
 
   if (!evento) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

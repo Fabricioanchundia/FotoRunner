@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Search, MapPin, Calendar, ChevronRight, CheckCircle } from 'lucide-react';
 import api from '@/lib/api';
+import LoadingScreen from '@/components/LoadingScreen';
 
 interface Evento {
   id: string;
@@ -43,6 +44,10 @@ export default function Home() {
     if (tipo === 'CICLISMO') return '#6366f1';
     return '#8b5cf6';
   };
+
+  if (cargando) {
+    return <LoadingScreen variant="cliente" />;
+  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'white', fontFamily: 'sans-serif' }}>

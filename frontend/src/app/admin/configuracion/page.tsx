@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import AdminSidebar from '@/components/AdminSidebar';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import LoadingScreen from '@/components/LoadingScreen';
 
 interface Evento {
   id: string;
@@ -41,6 +42,10 @@ export default function AdminConfiguracionPage() {
     if (s === 'PROXIMO') return '#3b82f6';
     return '#6b7280';
   };
+
+  if (cargando) {
+    return <LoadingScreen variant="admin" />;
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#16142a' }}>
