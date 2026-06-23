@@ -1,5 +1,5 @@
 import vision from '@google-cloud/vision';
-import path from 'path';
+import path from 'node:path';
 
 // Configurar credenciales
 const credentialsPath = path.join(process.cwd(), 'google-credentials.json');
@@ -110,8 +110,7 @@ const generarVector = (landmarks: { type: string; x: number; y: number; z: numbe
 
   const vector: number[] = [];
   for (const lm of landmarks) {
-    vector.push((lm.x - minX) / rangoX);
-    vector.push((lm.y - minY) / rangoY);
+    vector.push((lm.x - minX) / rangoX, (lm.y - minY) / rangoY);
   }
 
   return vector;

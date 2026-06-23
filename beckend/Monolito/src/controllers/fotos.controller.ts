@@ -15,7 +15,7 @@ const schemaSubirFoto = z.object({
   // privado (ej. "originales/123.jpg"), usado luego para generar Signed
   // URLs tras el pago. Solo se exige que no esté vacío.
   gcs_original_url: z.string().min(1, 'La referencia de la foto es requerida'),
-  gcs_watermark_url: z.string().url('URL inválida').optional()
+  gcs_watermark_url: z.url('URL inválida').optional()
 });
 
 export const listarFotosEvento = async (
@@ -49,13 +49,14 @@ export const listarMisFotos = async (
 ): Promise<void> => {
   try {
     const user_id = req.usuario!.id;
-    const event_id = req.query['event_id']
-      ? String(req.query['event_id'])
+    const event_id = typeof req.query['event_id'] === 'string'
+      ? req.query['event_id']
       : undefined;
 
     // Intentar usar ms-facial primero
     try {
-      const url = `${MS_FACIAL_URL}/api/facial/buscar/${user_id}${event_id ? `?event_id=${event_id}` : ''}`;
+      const queryEvento = event_id ? `?event_id=${event_id}` : '';
+      const url = `${MS_FACIAL_URL}/api/facial/buscar/${user_id}${queryEvento}`;
       const response = await fetch(url);
       const data = await response.json() as { exito: boolean; datos: any[] };
 
@@ -148,14 +149,14 @@ const schemaSubirFotosMultiple = z.object({
   event_id: z.string().min(1, 'El ID del evento es requerido'),
   fotos: z.array(z.object({
     gcs_original_url: z.string().min(1),
-    gcs_watermark_url: z.string().url().optional()
+    gcs_watermark_url: z.url().optional()
   })).min(1, 'Debes incluir al menos una foto')
 });
 
 // Registra varias fotos de una sola vez (ya subidas previamente al
 // almacenamiento vía POST /api/upload/fotos). Reutiliza la misma
-// validación de evento/permisos que subirFoto, una sola vez para todo
-// el lote en vez de repetirla por cada foto.
+// validación de evento/permisos que subirFoto, una sola vez para el
+// lote completo en vez de repetirla por cada foto.
 export const subirFotosMultiple = async (
   req: RequestAutenticado,
   res: Response

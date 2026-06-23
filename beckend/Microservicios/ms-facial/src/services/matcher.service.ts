@@ -28,8 +28,9 @@ export const registrarVectorUsuario = async (
       return { success: false, mensaje: 'No se detectó ningún rostro en la imagen' };
     }
 
-    const mejorRostro = faces.reduce((prev, curr) =>
-      curr.detectionConfidence > prev.detectionConfidence ? curr : prev
+    const mejorRostro = faces.reduce(
+      (prev, curr) => (curr.detectionConfidence > prev.detectionConfidence ? curr : prev),
+      faces[0]
     );
 
     const vectorString = JSON.stringify(mejorRostro.vector);
@@ -45,6 +46,53 @@ export const registrarVectorUsuario = async (
     return { success: false, mensaje: `Error: ${error}` };
   }
 };
+
+// Compara un rostro detectado contra todos los usuarios con vector
+// registrado y crea los FaceMatch que superen el umbral. Extraído de
+// procesarFotoEvento para bajar su complejidad cognitiva — el bucle
+// externo (por cada rostro) ahora solo llama a esto por cada uno.
+async function compararRostroConUsuarios(
+  vectorRostro: number[],
+  photoId: string,
+  usuarios: { id: string; nombre: string; face_vector: string | null }[]
+): Promise<number> {
+  let matchesEncontrados = 0;
+
+  for (const usuario of usuarios) {
+    try {
+      const vectorUsuario: number[] = JSON.parse(usuario.face_vector || '[]');
+      if (vectorUsuario.length === 0) continue;
+
+      const score = compararVectores(vectorRostro, vectorUsuario);
+      if (score < CONFIDENCE_MINIMO) continue;
+
+      const existente = await prisma.faceMatch.findUnique({
+        where: {
+          photo_id_user_id: {
+            photo_id: photoId,
+            user_id: usuario.id
+          }
+        }
+      });
+
+      if (!existente) {
+        await prisma.faceMatch.create({
+          data: {
+            photo_id: photoId,
+            user_id: usuario.id,
+            confidence_score: score
+          }
+        });
+        matchesEncontrados++;
+        console.log(`Match: Usuario ${usuario.nombre} en foto ${photoId} (score: ${score.toFixed(3)})`);
+      }
+    } catch (err) {
+      console.error(`Error comparando con usuario ${usuario.id}:`, err);
+    }
+  }
+
+  return matchesEncontrados;
+}
 
 // Procesar foto de evento — buscar matches con usuarios
 export const procesarFotoEvento = async (
@@ -77,41 +125,7 @@ export const procesarFotoEvento = async (
     // Comparar cada rostro detectado con cada usuario registrado
     for (const face of faces) {
       if (face.vector.length === 0) continue;
-
-      for (const usuario of usuarios) {
-        try {
-          const vectorUsuario: number[] = JSON.parse(usuario.face_vector || '[]');
-          if (vectorUsuario.length === 0) continue;
-
-          const score = compararVectores(face.vector, vectorUsuario);
-
-          if (score >= CONFIDENCE_MINIMO) {
-            // Verificar si ya existe el match
-            const existente = await prisma.faceMatch.findUnique({
-              where: {
-                photo_id_user_id: {
-                  photo_id: photoId,
-                  user_id: usuario.id
-                }
-              }
-            });
-
-            if (!existente) {
-              await prisma.faceMatch.create({
-                data: {
-                  photo_id: photoId,
-                  user_id: usuario.id,
-                  confidence_score: score
-                }
-              });
-              totalMatches++;
-              console.log(`Match: Usuario ${usuario.nombre} en foto ${photoId} (score: ${score.toFixed(3)})`);
-            }
-          }
-        } catch (err) {
-          console.error(`Error comparando con usuario ${usuario.id}:`, err);
-        }
-      }
+      totalMatches += await compararRostroConUsuarios(face.vector, photoId, usuarios);
     }
 
     // Marcar foto como procesada

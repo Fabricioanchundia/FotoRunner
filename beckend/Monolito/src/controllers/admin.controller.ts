@@ -220,6 +220,45 @@ export const actualizarPreciosEvento = async (req: RequestAutenticado, res: Resp
   }
 };
 
+// Construye el objeto `data` para el update de Prisma a partir del body.
+// Extraído de actualizarEventoCompleto para bajar su complejidad cognitiva
+// (sonarqube:S3776) sin cambiar el comportamiento: cada campo sigue siendo
+// opcional y solo se incluye si vino en el body.
+interface ResultadoDatosEvento {
+  data: Record<string, unknown>;
+  error?: string;
+}
+
+function construirDatosActualizacionEvento(body: any): ResultadoDatosEvento {
+  const { nombre, ciudad, fecha, tipo, cover_url, precio_individual, precio_photopass, disponible_hasta } = body;
+  const data: Record<string, unknown> = {};
+
+  if (nombre !== undefined) data['nombre'] = nombre;
+  if (ciudad !== undefined) data['ciudad'] = ciudad;
+  if (fecha !== undefined) data['fecha'] = new Date(fecha).toISOString();
+  if (tipo !== undefined) data['tipo'] = tipo;
+  if (cover_url !== undefined) data['cover_url'] = cover_url;
+  if (disponible_hasta !== undefined) {
+    data['disponible_hasta'] = disponible_hasta ? new Date(disponible_hasta).toISOString() : null;
+  }
+
+  if (precio_individual !== undefined) {
+    if (Number(precio_individual) <= 0) {
+      return { data, error: 'El precio individual debe ser mayor a 0' };
+    }
+    data['precio_individual'] = Number(precio_individual);
+  }
+
+  if (precio_photopass !== undefined) {
+    if (Number(precio_photopass) <= 0) {
+      return { data, error: 'El precio photopass debe ser mayor a 0' };
+    }
+    data['precio_photopass'] = Number(precio_photopass);
+  }
+
+  return { data };
+}
+
 // Actualiza TODOS los datos editables de un evento de una sola vez:
 // nombre, ciudad, fecha, tipo, portada y precios. Cada campo es opcional
 // en el body — solo se actualiza lo que venga incluido, para no pisar
@@ -227,30 +266,11 @@ export const actualizarPreciosEvento = async (req: RequestAutenticado, res: Resp
 export const actualizarEventoCompleto = async (req: RequestAutenticado, res: Response): Promise<void> => {
   try {
     const id = String(req.params['id']);
-    const { nombre, ciudad, fecha, tipo, cover_url, precio_individual, precio_photopass, disponible_hasta } = req.body;
+    const { data, error } = construirDatosActualizacionEvento(req.body);
 
-    const data: Record<string, unknown> = {};
-    if (nombre !== undefined) data['nombre'] = nombre;
-    if (ciudad !== undefined) data['ciudad'] = ciudad;
-    if (fecha !== undefined) data['fecha'] = new Date(fecha).toISOString();
-    if (tipo !== undefined) data['tipo'] = tipo;
-    if (cover_url !== undefined) data['cover_url'] = cover_url;
-    if (disponible_hasta !== undefined) {
-      data['disponible_hasta'] = disponible_hasta ? new Date(disponible_hasta).toISOString() : null;
-    }
-    if (precio_individual !== undefined) {
-      if (Number(precio_individual) <= 0) {
-        responderError(res, 'El precio individual debe ser mayor a 0', 400);
-        return;
-      }
-      data['precio_individual'] = Number(precio_individual);
-    }
-    if (precio_photopass !== undefined) {
-      if (Number(precio_photopass) <= 0) {
-        responderError(res, 'El precio photopass debe ser mayor a 0', 400);
-        return;
-      }
-      data['precio_photopass'] = Number(precio_photopass);
+    if (error) {
+      responderError(res, error, 400);
+      return;
     }
 
     if (Object.keys(data).length === 0) {

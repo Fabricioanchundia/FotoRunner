@@ -10,11 +10,11 @@ const prisma = new PrismaClient();
 const schemaEvento = z.object({
   nombre: z.string().min(3),
   descripcion: z.string().optional(),
-  fecha: z.string().datetime(),
+  fecha: z.iso.datetime(),
   ciudad: z.string().min(2),
   tipo: z.enum(['RUNNING', 'ATLETISMO', 'CICLISMO']),
-  cover_url: z.string().url().optional(),
-  disponible_hasta: z.string().datetime().optional()
+  cover_url: z.url().optional(),
+  disponible_hasta: z.iso.datetime().optional()
 });
 
 export const listarEventos = async (
@@ -23,10 +23,11 @@ export const listarEventos = async (
 ): Promise<void> => {
   try {
     const { ciudad, tipo, status } = req.query;
+    const ciudadFiltro = typeof ciudad === 'string' ? ciudad : undefined;
 
     const eventos = await prisma.event.findMany({
       where: {
-        ...(ciudad && { ciudad: { contains: String(ciudad), mode: 'insensitive' } }),
+        ...(ciudadFiltro && { ciudad: { contains: ciudadFiltro, mode: 'insensitive' } }),
         ...(tipo && { tipo: tipo as 'RUNNING' | 'ATLETISMO' | 'CICLISMO' }),
         ...(status && { status: status as 'PROXIMO' | 'ACTIVO' | 'COMPLETADO' })
       },

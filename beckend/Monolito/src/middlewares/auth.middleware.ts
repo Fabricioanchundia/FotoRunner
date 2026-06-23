@@ -47,7 +47,7 @@ export const verificarToken = async (
       }
 
       const expira = usuario.helper_expires_at
-        ? new Date(usuario.helper_expires_at as unknown as string)
+        ? new Date(usuario.helper_expires_at)
         : null;
 
       if (!expira || expira.getTime() < Date.now()) {

@@ -61,7 +61,7 @@ export const registrar = async (req: Request, res: Response): Promise<void> => {
       token,
       usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, role: usuario.role },
       verificacionPendiente: true,
-      codigoDesarrollo: process.env['NODE_ENV'] !== 'production' ? codigo : undefined
+      codigoDesarrollo: process.env['NODE_ENV'] === 'production' ? undefined : codigo
     }, 'Usuario registrado. Verifica tu correo.');
   } catch (error) {
     logger.error(`Error registro: ${error}`);
@@ -121,7 +121,7 @@ export const reenviarCodigo = async (req: Request, res: Response): Promise<void>
     logger.info(`[VERIFICACION] Nuevo código para ${email}: ${codigo}`);
 
     responderExito(res, {
-      codigoDesarrollo: process.env['NODE_ENV'] !== 'production' ? codigo : undefined
+      codigoDesarrollo: process.env['NODE_ENV'] === 'production' ? undefined : codigo
     }, 'Código reenviado');
   } catch (error) {
     logger.error(`Error reenvío: ${error}`);

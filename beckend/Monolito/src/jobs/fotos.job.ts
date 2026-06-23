@@ -1,7 +1,7 @@
 import Bull from 'bull';
 import sharp from 'sharp';
 import { PrismaClient } from '@prisma/client';
-import { subirArchivo } from '../services/storage.service';
+import { subirFotoCompleta } from '../services/storage.service';
 import logger from '../utils/logger';
 import axios from 'axios';
 
@@ -25,7 +25,7 @@ fotosQueue.process(async (job) => {
     const response = await axios.get(gcsOriginalUrl, {
       responseType: 'arraybuffer'
     });
-    const buffer = Buffer.from(response.data as ArrayBuffer);
+    const bufferOriginal = Buffer.from(response.data as ArrayBuffer);
 
     // Agregar marca de agua con Sharp
     const marcaDeAgua = Buffer.from(`
@@ -43,7 +43,7 @@ fotosQueue.process(async (job) => {
       </svg>
     `);
 
-    const imagenConMarca = await sharp(buffer)
+    const bufferWatermark = await sharp(bufferOriginal)
       .composite([{
         input: marcaDeAgua,
         gravity: 'south'
@@ -51,11 +51,13 @@ fotosQueue.process(async (job) => {
       .jpeg({ quality: 85 })
       .toBuffer();
 
-    // Subir versión con marca de agua a GCS
-    const nombreArchivo = `watermark/${photoId}.jpg`;
-    const urlMarca = await subirArchivo(
-      imagenConMarca,
-      nombreArchivo,
+    // Subir AMBAS versiones (original al bucket privado, marca al
+    // público) usando el mismo servicio de Cloud Storage que usa el
+    // flujo síncrono de subida directa.
+    const { urlPublica } = await subirFotoCompleta(
+      bufferOriginal,
+      bufferWatermark,
+      `${photoId}.jpg`,
       'image/jpeg'
     );
 
@@ -63,13 +65,13 @@ fotosQueue.process(async (job) => {
     await prisma.photo.update({
       where: { id: photoId },
       data: {
-        gcs_watermark_url: urlMarca,
+        gcs_watermark_url: urlPublica,
         processed_at: new Date()
       }
     });
 
     logger.info(`Foto procesada exitosamente: ${photoId}`);
-    return { success: true, photoId, urlMarca };
+    return { success: true, photoId, urlMarca: urlPublica };
   } catch (error) {
     logger.error(`Error procesando foto ${photoId}: ${error}`);
     throw error;

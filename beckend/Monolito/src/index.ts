@@ -1,7 +1,7 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
-import path from 'path';
+import path from 'node:path';
 import dotenv from 'dotenv';
 
 import authRoutes from './routes/auth.routes';

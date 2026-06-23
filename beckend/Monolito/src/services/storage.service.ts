@@ -1,4 +1,4 @@
-import path from 'path';
+import path from 'node:path';
 import { Storage } from '@google-cloud/storage';
 import logger from '../utils/logger';
 

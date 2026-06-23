@@ -10,7 +10,7 @@ const router = Router();
 // Almacenamiento EN MEMORIA — el archivo nunca se escribe en disco local.
 // Esto es necesario para producción: el contenedor/servidor puede
 // reiniciarse o redeployarse sin perder fotos, porque nada vive en su
-// propio disco efímero. Todo va directo a Google Cloud Storage.
+// propio disco efímero. La subida completa va directo a Google Cloud Storage.
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
