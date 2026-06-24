@@ -14,6 +14,8 @@ interface Foto {
   evento: { id: string; nombre: string; ciudad: string };
 }
 
+const SKELETON_KEYS = Array.from({ length: 12 }, (_, i) => `sk-${i}`);
+
 export default function AdminFotosPage() {
   const [fotos, setFotos] = useState<Foto[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -56,6 +58,89 @@ export default function AdminFotosPage() {
     f.evento.ciudad.toLowerCase().includes(busqueda.toLowerCase())
   );
 
+  let contenidoGrid;
+  if (cargando) {
+    contenidoGrid = (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+        {SKELETON_KEYS.map((key) => (
+          <div key={key} style={{ backgroundColor: '#1d1a38', borderRadius: '14px', aspectRatio: '4/3' }} />
+        ))}
+      </div>
+    );
+  } else if (filtradas.length === 0) {
+    contenidoGrid = (
+      <div style={{ textAlign: 'center', padding: '80px', color: 'rgba(255,255,255,0.3)' }}>
+        <Image size={48} style={{ margin: '0 auto 16px', display: 'block', opacity: 0.3 }} />
+        <p style={{ fontWeight: 700, fontSize: '18px', marginBottom: '8px', color: 'rgba(255,255,255,0.5)' }}>
+          No hay fotos aún
+        </p>
+        <p style={{ fontSize: '14px' }}>
+          Sube fotos desde el panel de galerías
+        </p>
+      </div>
+    );
+  } else {
+    contenidoGrid = (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+        {filtradas.map((foto) => (
+          <div key={foto.id}
+            style={{ backgroundColor: '#1d1a38', borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(165,180,252,0.1)', transition: 'border-color 0.2s' }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(129,140,248,0.5)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(165,180,252,0.1)'; }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(129,140,248,0.5)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(165,180,252,0.1)'; }}>
+
+            {/* Imagen */}
+            <div
+              role="button"
+              tabIndex={0}
+              style={{ position: 'relative', aspectRatio: '4/3', backgroundColor: '#0f172a', cursor: 'pointer' }}
+              onClick={() => setFotoAmpliada(foto)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFotoAmpliada(foto); } }}>
+              <img
+                src={foto.gcs_watermark_url || foto.gcs_original_url}
+                alt="foto"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x225?text=Sin+imagen';
+                }}
+              />
+              {/* Badge procesado */}
+              <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: foto.processed_at ? 'rgba(34,197,94,0.85)' : 'rgba(0,0,0,0.6)', color: 'white', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px' }}>
+                {foto.processed_at ? '✓ Procesada' : '⏳ Pendiente'}
+              </div>
+            </div>
+
+            {/* Info */}
+            <div style={{ padding: '12px 14px' }}>
+              <p style={{ color: 'white', fontWeight: 700, fontSize: '13px', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {foto.evento.nombre}
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <MapPin size={10} /> {foto.evento.ciudad}
+                </span>
+                <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Calendar size={10} />
+                  {new Date(foto.created_at).toLocaleDateString('es-EC')}
+                </span>
+              </div>
+
+              {/* Botón eliminar */}
+              <button
+                onClick={() => eliminar(foto.id)}
+                disabled={eliminando === foto.id}
+                style={{ width: '100%', marginTop: '10px', backgroundColor: eliminando === foto.id ? '#334155' : 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '7px', color: '#f87171', fontSize: '12px', fontWeight: 700, cursor: eliminando === foto.id ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                <Trash2 size={13} />
+                {eliminando === foto.id ? 'Eliminando...' : 'Eliminar foto'}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#16142a' }}>
       <AdminSidebar />
@@ -86,84 +171,19 @@ export default function AdminFotosPage() {
 
         {/* GRID */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', backgroundColor: '#16142a' }}>
-          {cargando ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-              {[...Array(12)].map((_, i) => (
-                <div key={i} style={{ backgroundColor: '#1d1a38', borderRadius: '14px', aspectRatio: '4/3' }} />
-              ))}
-            </div>
-          ) : filtradas.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px', color: 'rgba(255,255,255,0.3)' }}>
-              <Image size={48} style={{ margin: '0 auto 16px', display: 'block', opacity: 0.3 }} />
-              <p style={{ fontWeight: 700, fontSize: '18px', marginBottom: '8px', color: 'rgba(255,255,255,0.5)' }}>
-                No hay fotos aún
-              </p>
-              <p style={{ fontSize: '14px' }}>
-                Sube fotos desde el panel de galerías
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-              {filtradas.map((foto) => (
-                <div key={foto.id}
-                  style={{ backgroundColor: '#1d1a38', borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(165,180,252,0.1)', transition: 'border-color 0.2s' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(129,140,248,0.5)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(165,180,252,0.1)'; }}>
-
-                  {/* Imagen */}
-                  <div style={{ position: 'relative', aspectRatio: '4/3', backgroundColor: '#0f172a', cursor: 'pointer' }}
-                    onClick={() => setFotoAmpliada(foto)}>
-                    <img
-                      src={foto.gcs_watermark_url || foto.gcs_original_url}
-                      alt="foto"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x225?text=Sin+imagen';
-                      }}
-                    />
-                    {/* Badge procesado */}
-                    <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: foto.processed_at ? 'rgba(34,197,94,0.85)' : 'rgba(0,0,0,0.6)', color: 'white', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px' }}>
-                      {foto.processed_at ? '✓ Procesada' : '⏳ Pendiente'}
-                    </div>
-                  </div>
-
-                  {/* Info */}
-                  <div style={{ padding: '12px 14px' }}>
-                    <p style={{ color: 'white', fontWeight: 700, fontSize: '13px', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {foto.evento.nombre}
-                    </p>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <MapPin size={10} /> {foto.evento.ciudad}
-                      </span>
-                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Calendar size={10} />
-                        {new Date(foto.created_at).toLocaleDateString('es-EC')}
-                      </span>
-                    </div>
-
-                    {/* Botón eliminar */}
-                    <button
-                      onClick={() => eliminar(foto.id)}
-                      disabled={eliminando === foto.id}
-                      style={{ width: '100%', marginTop: '10px', backgroundColor: eliminando === foto.id ? '#334155' : 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '7px', color: '#f87171', fontSize: '12px', fontWeight: 700, cursor: eliminando === foto.id ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                      <Trash2 size={13} />
-                      {eliminando === foto.id ? 'Eliminando...' : 'Eliminar foto'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {contenidoGrid}
         </div>
       </div>
 
       {/* MODAL FOTO AMPLIADA */}
       {fotoAmpliada && (
         <div
+          role="button"
+          tabIndex={0}
           onClick={() => setFotoAmpliada(null)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') { setFotoAmpliada(null); } }}
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.92)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '100%', position: 'relative' }}>
+          <div role="presentation" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '100%', position: 'relative' }}>
             <img
               src={fotoAmpliada.gcs_watermark_url || fotoAmpliada.gcs_original_url}
               alt="Foto ampliada"

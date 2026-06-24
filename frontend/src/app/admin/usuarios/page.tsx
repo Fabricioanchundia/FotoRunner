@@ -43,6 +43,46 @@ export default function AdminUsuariosPage() {
     u.email.toLowerCase().includes(busqueda.toLowerCase())
   );
 
+  let contenidoTabla;
+  if (cargando) {
+    contenidoTabla = (
+      <div style={{ padding: '48px', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>Cargando...</div>
+    );
+  } else if (filtrados.length === 0) {
+    contenidoTabla = (
+      <div style={{ padding: '48px', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>No hay usuarios</div>
+    );
+  } else {
+    contenidoTabla = filtrados.map((u, i) => (
+      <div key={u.id} style={{ padding: '16px 24px', borderBottom: i < filtrados.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ flex: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#FF6B00', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <span style={{ color: 'white', fontWeight: 700, fontSize: '14px' }}>{u.nombre.charAt(0).toUpperCase()}</span>
+            </div>
+            <div>
+              <p style={{ color: 'white', fontWeight: 600, fontSize: '14px' }}>{u.nombre}</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>{u.email}</p>
+            </div>
+          </div>
+        </div>
+        <span style={{ color: 'white', fontSize: '14px', flex: 1 }}>{u._count.ordenes}</span>
+        <span style={{ color: 'white', fontSize: '14px', flex: 1 }}>{u._count.face_matches}</span>
+        <div style={{ flex: 1 }}>
+          <span style={{ backgroundColor: u.role === 'ADMIN' ? '#FF6B00' : 'rgba(255,255,255,0.1)', color: 'white', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px' }}>
+            {u.role}
+          </span>
+        </div>
+        <div style={{ flex: 1 }}>
+          <button onClick={() => cambiarRol(u.id, u.role)}
+            style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', padding: '6px 12px', color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+            {u.role === 'ADMIN' ? 'Quitar admin' : 'Hacer admin'}
+          </button>
+        </div>
+      </div>
+    ));
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#16142a' }}>
       <AdminSidebar />
@@ -69,38 +109,7 @@ export default function AdminUsuariosPage() {
             <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', flex: 1 }}>ACCIÓN</span>
           </div>
 
-          {cargando ? (
-            <div style={{ padding: '48px', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>Cargando...</div>
-          ) : filtrados.length === 0 ? (
-            <div style={{ padding: '48px', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>No hay usuarios</div>
-          ) : filtrados.map((u, i) => (
-            <div key={u.id} style={{ padding: '16px 24px', borderBottom: i < filtrados.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ flex: 2 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#FF6B00', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span style={{ color: 'white', fontWeight: 700, fontSize: '14px' }}>{u.nombre.charAt(0).toUpperCase()}</span>
-                  </div>
-                  <div>
-                    <p style={{ color: 'white', fontWeight: 600, fontSize: '14px' }}>{u.nombre}</p>
-                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>{u.email}</p>
-                  </div>
-                </div>
-              </div>
-              <span style={{ color: 'white', fontSize: '14px', flex: 1 }}>{u._count.ordenes}</span>
-              <span style={{ color: 'white', fontSize: '14px', flex: 1 }}>{u._count.face_matches}</span>
-              <div style={{ flex: 1 }}>
-                <span style={{ backgroundColor: u.role === 'ADMIN' ? '#FF6B00' : 'rgba(255,255,255,0.1)', color: 'white', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px' }}>
-                  {u.role}
-                </span>
-              </div>
-              <div style={{ flex: 1 }}>
-                <button onClick={() => cambiarRol(u.id, u.role)}
-                  style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', padding: '6px 12px', color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                  {u.role === 'ADMIN' ? 'Quitar admin' : 'Hacer admin'}
-                </button>
-              </div>
-            </div>
-          ))}
+          {contenidoTabla}
         </div>
       </div>
     </div>

@@ -12,6 +12,8 @@ interface Stats {
   ingresoTotal: number;
 }
 
+const SKELETON_KEYS = ['sk-1', 'sk-2', 'sk-3', 'sk-4', 'sk-5'];
+
 export default function AdminMonitorPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -47,8 +49,8 @@ export default function AdminMonitorPage() {
 
         {cargando ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
-            {[...Array(5)].map((_, i) => (
-              <div key={i} style={{ backgroundColor: '#1d1a38', borderRadius: '16px', height: '120px' }} />
+            {SKELETON_KEYS.map((key) => (
+              <div key={key} style={{ backgroundColor: '#1d1a38', borderRadius: '16px', height: '120px' }} />
             ))}
           </div>
         ) : (

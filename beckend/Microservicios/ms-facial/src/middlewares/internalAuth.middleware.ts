@@ -9,7 +9,7 @@ import { Request, Response, NextFunction } from 'express';
 //   - gastar cuota de Google Cloud Vision por POST /procesar-foto|evento
 //
 // Importante: si INTERNAL_API_KEY no está configurada, el middleware
-// BLOQUEA todo (falla cerrado) en vez de dejar pasar todo por accidente.
+// bloquea por completo (falla cerrado) en vez de permitir el acceso por accidente.
 const INTERNAL_API_KEY = process.env['INTERNAL_API_KEY'];
 
 export const verificarLlaveInterna = (

@@ -197,7 +197,12 @@ export default function AdminEventoFotosPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
               {fotos.map((foto) => (
                 <div key={foto.id} style={{ backgroundColor: '#1d1a38', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(165,180,252,0.1)' }}>
-                  <div style={{ position: 'relative', aspectRatio: '4/3', cursor: 'pointer' }} onClick={() => setFotoAmpliada(foto)}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    style={{ position: 'relative', aspectRatio: '4/3', cursor: 'pointer' }}
+                    onClick={() => setFotoAmpliada(foto)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFotoAmpliada(foto); } }}>
                     <img
                       src={foto.gcs_watermark_url || foto.gcs_original_url}
                       alt="foto"
@@ -245,12 +250,15 @@ export default function AdminEventoFotosPage() {
             </div>
             <form onSubmit={subirFoto}>
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => document.getElementById('inputFotoEvento')?.click()}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('inputFotoEvento')?.click(); } }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) manejarArchivo(f); }}
                 style={{ border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '14px', padding: '28px', textAlign: 'center', cursor: 'pointer', marginBottom: '16px', backgroundColor: 'rgba(255,255,255,0.02)' }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = '#0ea5e9'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.1)'; }}>
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0ea5e9'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}>
                 <input id="inputFotoEvento" type="file" accept="image/*" style={{ display: 'none' }}
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) manejarArchivo(f); }} />
                 {previewFoto ? (
@@ -300,9 +308,13 @@ export default function AdminEventoFotosPage() {
 
       {/* MODAL FOTO AMPLIADA */}
       {fotoAmpliada && (
-        <div onClick={() => setFotoAmpliada(null)}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setFotoAmpliada(null)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') { setFotoAmpliada(null); } }}
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.92)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '100%', position: 'relative' }}>
+          <div role="presentation" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '100%', position: 'relative' }}>
             <img src={fotoAmpliada.gcs_watermark_url || fotoAmpliada.gcs_original_url}
               alt="Foto ampliada" style={{ width: '100%', borderRadius: '16px' }}
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
