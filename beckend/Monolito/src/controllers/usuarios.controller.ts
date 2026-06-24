@@ -7,6 +7,7 @@ import { RequestAutenticado } from '../middlewares/auth.middleware';
 
 const prisma = new PrismaClient();
 const MS_FACIAL_URL = process.env['MS_FACIAL_URL'] || 'http://localhost:3002';
+const MS_FACIAL_API_KEY = process.env['INTERNAL_API_KEY'] || '';
 
 const schemaActualizar = z.object({
   nombre: z.string().min(2).optional(),
@@ -74,7 +75,10 @@ export const actualizarUsuario = async (
       try {
         await fetch(`${MS_FACIAL_URL}/api/facial/registrar-vector`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-api-key': MS_FACIAL_API_KEY
+          },
           body: JSON.stringify({
             user_id: id,
             avatar_url: datos.data.avatar_url

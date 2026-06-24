@@ -7,6 +7,7 @@ import { RequestAutenticado } from '../middlewares/auth.middleware';
 
 const prisma = new PrismaClient();
 const MS_FACIAL_URL = process.env['MS_FACIAL_URL'] || 'http://localhost:3002';
+const MS_FACIAL_API_KEY = process.env['INTERNAL_API_KEY'] || '';
 
 const schemaSubirFoto = z.object({
   event_id: z.string().min(1, 'El ID del evento es requerido'),
@@ -15,7 +16,7 @@ const schemaSubirFoto = z.object({
   // privado (ej. "originales/123.jpg"), usado luego para generar Signed
   // URLs tras el pago. Solo se exige que no esté vacío.
   gcs_original_url: z.string().min(1, 'La referencia de la foto es requerida'),
-  gcs_watermark_url: z.url('URL inválida').optional()
+  gcs_watermark_url: z.string().url('URL inválida').optional()
 });
 
 export const listarFotosEvento = async (
@@ -49,15 +50,16 @@ export const listarMisFotos = async (
 ): Promise<void> => {
   try {
     const user_id = req.usuario!.id;
-    const event_id = typeof req.query['event_id'] === 'string'
-      ? req.query['event_id']
+    const event_id = req.query['event_id']
+      ? String(req.query['event_id'])
       : undefined;
 
     // Intentar usar ms-facial primero
     try {
-      const queryEvento = event_id ? `?event_id=${event_id}` : '';
-      const url = `${MS_FACIAL_URL}/api/facial/buscar/${user_id}${queryEvento}`;
-      const response = await fetch(url);
+      const url = `${MS_FACIAL_URL}/api/facial/buscar/${user_id}${event_id ? `?event_id=${event_id}` : ''}`;
+      const response = await fetch(url, {
+        headers: { 'x-internal-api-key': MS_FACIAL_API_KEY }
+      });
       const data = await response.json() as { exito: boolean; datos: any[] };
 
       if (data.exito && Array.isArray(data.datos)) {
@@ -130,7 +132,10 @@ export const subirFoto = async (
     const urlParaDeteccion = foto.gcs_watermark_url || foto.gcs_original_url;
     fetch(`${MS_FACIAL_URL}/api/facial/procesar-foto`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-api-key': MS_FACIAL_API_KEY
+      },
       body: JSON.stringify({
         photo_id: foto.id,
         photo_url: urlParaDeteccion
@@ -149,14 +154,14 @@ const schemaSubirFotosMultiple = z.object({
   event_id: z.string().min(1, 'El ID del evento es requerido'),
   fotos: z.array(z.object({
     gcs_original_url: z.string().min(1),
-    gcs_watermark_url: z.url().optional()
+    gcs_watermark_url: z.string().url().optional()
   })).min(1, 'Debes incluir al menos una foto')
 });
 
 // Registra varias fotos de una sola vez (ya subidas previamente al
 // almacenamiento vía POST /api/upload/fotos). Reutiliza la misma
-// validación de evento/permisos que subirFoto, una sola vez para el
-// lote completo en vez de repetirla por cada foto.
+// validación de evento/permisos que subirFoto, una sola vez para todo
+// el lote en vez de repetirla por cada foto.
 export const subirFotosMultiple = async (
   req: RequestAutenticado,
   res: Response
@@ -209,7 +214,10 @@ export const subirFotosMultiple = async (
       const urlParaDeteccion = foto.gcs_watermark_url || foto.gcs_original_url;
       fetch(`${MS_FACIAL_URL}/api/facial/procesar-foto`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-api-key': MS_FACIAL_API_KEY
+        },
         body: JSON.stringify({ photo_id: foto.id, photo_url: urlParaDeteccion })
       }).catch(err => logger.warn(`MS-Facial procesar-foto error: ${err}`));
     }
