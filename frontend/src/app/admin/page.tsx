@@ -37,34 +37,35 @@ const SKELETON_KEYS = Array.from({ length: 6 }, (_, i) => `sk-${i}`);
 // --- Dropzone genérico de arrastrar/soltar una imagen ---
 // Reutilizado por ModalSubirFoto en sus dos modos (una / varias). Extraído
 // como función de nivel superior (no anidada) para que su lógica no sume
-// a la complejidad cognitiva del componente que lo usa.
-function Dropzone({ onAbrirSelector, onDrop, children }: {
+// a la complejidad cognitiva del componente que lo usa. Es un <button>
+// real (no un div con role="button") — el <input type="file"> oculto
+// que dispara vive AFUERA, como hermano, porque un <button> no puede
+// contener elementos interactivos anidados (sería HTML inválido).
+function Dropzone({ onAbrirSelector, onDrop, children }: Readonly<{
   onAbrirSelector: () => void;
-  onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDrop: (e: React.DragEvent<HTMLButtonElement>) => void;
   children: React.ReactNode;
-}) {
+}>) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
       onClick={onAbrirSelector}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAbrirSelector(); } }}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
-      style={{ border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '14px', padding: '28px', textAlign: 'center', cursor: 'pointer', marginBottom: '16px', backgroundColor: 'rgba(255,255,255,0.02)' }}
+      style={{ width: '100%', border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '14px', padding: '28px', textAlign: 'center', cursor: 'pointer', marginBottom: '16px', backgroundColor: 'rgba(255,255,255,0.02)', font: 'inherit', color: 'inherit' }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0ea5e9'; }}
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
       onFocus={(e) => { e.currentTarget.style.borderColor = '#0ea5e9'; }}
       onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}>
       {children}
-    </div>
+    </button>
   );
 }
 
 // --- Modal: crear galería/evento ---
 // Tiene su propio estado de formulario — AdminPage solo necesita saber
 // si está abierto y refrescar la lista cuando se crea uno nuevo.
-function ModalCrearEvento({ onClose, onCreado }: { onClose: () => void; onCreado: () => void }) {
+function ModalCrearEvento({ onClose, onCreado }: Readonly<{ onClose: () => void; onCreado: () => void }>) {
   const [creando, setCreando] = useState(false);
   const [form, setForm] = useState({
     nombre: '', ciudad: '', fecha: '', tipo: 'RUNNING',
@@ -112,10 +113,10 @@ function ModalCrearEvento({ onClose, onCreado }: { onClose: () => void; onCreado
         <form onSubmit={crearEvento}>
           {camposTexto.map((campo) => (
             <div key={campo.key} style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>
+              <label htmlFor={`crear-${campo.key}`} style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>
                 {campo.label}
               </label>
-              <input type={campo.type} required={campo.required}
+              <input id={`crear-${campo.key}`} type={campo.type} required={campo.required}
                 value={form[campo.key as keyof typeof form]}
                 onChange={(e) => setForm({ ...form, [campo.key]: e.target.value })}
                 placeholder={campo.placeholder}
@@ -123,8 +124,8 @@ function ModalCrearEvento({ onClose, onCreado }: { onClose: () => void; onCreado
             </div>
           ))}
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Tipo</label>
-            <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+            <label htmlFor="crear-tipo" style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Tipo</label>
+            <select id="crear-tipo" value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}
               style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }}>
               <option value="RUNNING">Running</option>
               <option value="ATLETISMO">Atletismo</option>
@@ -137,22 +138,22 @@ function ModalCrearEvento({ onClose, onCreado }: { onClose: () => void; onCreado
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase' }}>Precios</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '6px' }}>Individual ($)</label>
-                <input type="number" step="0.01" min="0.99" required value={form.precio_individual}
+                <label htmlFor="crear-precio-individual" style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '6px' }}>Individual ($)</label>
+                <input id="crear-precio-individual" type="number" step="0.01" min="0.99" required value={form.precio_individual}
                   onChange={(e) => setForm({ ...form, precio_individual: e.target.value })}
                   style={{ width: '100%', backgroundColor: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '10px', padding: '10px 12px', fontSize: '16px', fontWeight: 800, color: '#38bdf8', outline: 'none', boxSizing: 'border-box' }} />
               </div>
               <div>
-                <label style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '6px' }}>Photopass ($)</label>
-                <input type="number" step="0.01" min="0.99" required value={form.precio_photopass}
+                <label htmlFor="crear-precio-photopass" style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '6px' }}>Photopass ($)</label>
+                <input id="crear-precio-photopass" type="number" step="0.01" min="0.99" required value={form.precio_photopass}
                   onChange={(e) => setForm({ ...form, precio_photopass: e.target.value })}
                   style={{ width: '100%', backgroundColor: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '10px', padding: '10px 12px', fontSize: '16px', fontWeight: 800, color: '#a78bfa', outline: 'none', boxSizing: 'border-box' }} />
               </div>
             </div>
           </div>
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Descripción (opcional)</label>
-            <textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+            <label htmlFor="crear-descripcion" style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Descripción (opcional)</label>
+            <textarea id="crear-descripcion" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
               placeholder="Descripción del evento..." rows={2}
               style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box', resize: 'vertical' }} />
           </div>
@@ -172,14 +173,226 @@ function ModalCrearEvento({ onClose, onCreado }: { onClose: () => void; onCreado
   );
 }
 
+type ResultadoSubida = { ok: true } | { ok: false; mensaje: string };
+
+// Valida y filtra los archivos arrastrados/seleccionados para la subida
+// múltiple — misma validación de antes (tipo imagen + máx 10MB), solo
+// movida afuera de ModalSubirFoto para bajar su complejidad cognitiva.
+function filtrarArchivosValidos(files: FileList): File[] {
+  const validos: File[] = [];
+  for (const file of Array.from(files)) {
+    if (!file.type.startsWith('image/')) { toast.error(`${file.name}: solo imágenes`); continue; }
+    if (file.size > 10 * 1024 * 1024) { toast.error(`${file.name}: máximo 10MB`); continue; }
+    validos.push(file);
+  }
+  return validos;
+}
+
+// Sube una sola foto (archivo o URL) — misma lógica de red de antes,
+// solo movida afuera del componente. Devuelve un resultado en vez de
+// lanzar/mostrar el toast directamente, para que el componente decida
+// qué hacer (cerrar modal, refrescar lista, etc.) con el mismo mensaje
+// exacto que tenía cada caso de error.
+async function ejecutarSubidaFoto(params: {
+  eventoId: string;
+  archivoFoto: File | null;
+  urlFoto: string;
+  urlWatermark: string;
+}): Promise<ResultadoSubida> {
+  try {
+    let urlFinal = params.urlFoto;
+    let urlWatermarkFinal = params.urlWatermark;
+
+    if (params.archivoFoto) {
+      const formData = new FormData();
+      formData.append('foto', params.archivoFoto);
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:3001/api/upload/foto', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+      const data = await res.json();
+      if (!data.exito) throw new Error(data.mensaje);
+      urlFinal = data.datos.url;
+      urlWatermarkFinal = data.datos.url_watermark;
+    }
+
+    if (!urlFinal) return { ok: false, mensaje: 'Selecciona foto o URL' };
+
+    await api.post('/fotos', {
+      event_id: params.eventoId,
+      gcs_original_url: urlFinal,
+      ...(urlWatermarkFinal && { gcs_watermark_url: urlWatermarkFinal })
+    });
+    return { ok: true };
+  } catch (err: unknown) {
+    const error = err as { response?: { data?: { mensaje?: string } } };
+    return { ok: false, mensaje: error.response?.data?.mensaje || 'Error al subir foto' };
+  }
+}
+
+// Sube varias fotos de una vez — misma lógica de red de antes.
+async function ejecutarSubidaFotosVarias(params: {
+  eventoId: string;
+  archivos: File[];
+  onArchivosSubidos?: () => void;
+}): Promise<ResultadoSubida> {
+  try {
+    const formData = new FormData();
+    params.archivos.forEach((file) => formData.append('fotos', file));
+    const token = localStorage.getItem('token');
+    const res = await fetch('http://localhost:3001/api/upload/fotos', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData
+    });
+    const data = await res.json();
+    if (!data.exito) throw new Error(data.mensaje);
+
+    params.onArchivosSubidos?.();
+
+    await api.post('/fotos/multiple', {
+      event_id: params.eventoId,
+      fotos: data.datos.map((r: { url: string; url_watermark: string }) => ({
+        gcs_original_url: r.url,
+        gcs_watermark_url: r.url_watermark
+      }))
+    });
+    return { ok: true };
+  } catch (err: unknown) {
+    const error = err as { response?: { data?: { mensaje?: string } } };
+    return { ok: false, mensaje: error.response?.data?.mensaje || 'Error al subir las fotos' };
+  }
+}
+
+// --- Formulario: subir UNA foto (archivo o URL) ---
+function FormSubirUna({ archivoFoto, previewFoto, urlFoto, subiendoFoto, onArchivo, onUrlChange, onQuitarArchivo, onSubmit, onCancelar }: Readonly<{
+  archivoFoto: File | null;
+  previewFoto: string;
+  urlFoto: string;
+  subiendoFoto: boolean;
+  onArchivo: (file: File) => void;
+  onUrlChange: (value: string) => void;
+  onQuitarArchivo: () => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onCancelar: () => void;
+}>) {
+  return (
+    <form onSubmit={onSubmit}>
+      <input id="inputFotoAdmin" type="file" accept="image/*" style={{ display: 'none' }}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onArchivo(f); }} />
+      <Dropzone
+        onAbrirSelector={() => document.getElementById('inputFotoAdmin')?.click()}
+        onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) onArchivo(f); }}>
+        {previewFoto ? (
+          <img src={previewFoto} alt="preview" style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '10px' }} />
+        ) : (
+          <>
+            <Upload size={28} color="rgba(255,255,255,0.3)" style={{ margin: '0 auto 10px', display: 'block' }} />
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>Arrastra aquí o clic para seleccionar</p>
+            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>JPG, PNG, WEBP · máx 10MB</p>
+          </>
+        )}
+      </Dropzone>
+
+      {archivoFoto && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px' }}>
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>📁 {archivoFoto.name}</span>
+          <button type="button" onClick={onQuitarArchivo}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+        <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>o ingresa URL</span>
+        <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+      </div>
+
+      <input type="url" value={urlFoto}
+        onChange={(e) => onUrlChange(e.target.value)}
+        placeholder="https://..."
+        style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box', marginBottom: '16px' }} />
+
+      <div style={{ display: 'flex', gap: '12px' }}>
+        <button type="button" onClick={onCancelar}
+          style={{ flex: 1, border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
+          Cancelar
+        </button>
+        <button type="submit" disabled={subiendoFoto || (!archivoFoto && !urlFoto)}
+          style={{ flex: 1, background: subiendoFoto || (!archivoFoto && !urlFoto) ? '#334155' : 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+          {subiendoFoto ? 'Subiendo...' : '+ Subir foto'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// --- Formulario: subir VARIAS fotos ---
+function FormSubirVarias({ archivosVarios, subiendoFoto, progresoVarios, onArchivos, onQuitarArchivo, onSubirVarias, onCancelar }: Readonly<{
+  archivosVarios: File[];
+  subiendoFoto: boolean;
+  progresoVarios: { actual: number; total: number };
+  onArchivos: (files: FileList) => void;
+  onQuitarArchivo: (index: number) => void;
+  onSubirVarias: () => void;
+  onCancelar: () => void;
+}>) {
+  return (
+    <div>
+      <input id="inputFotosVariasAdmin" type="file" accept="image/*" multiple style={{ display: 'none' }}
+        onChange={(e) => { if (e.target.files?.length) { onArchivos(e.target.files); } e.target.value = ''; }} />
+      <Dropzone
+        onAbrirSelector={() => document.getElementById('inputFotosVariasAdmin')?.click()}
+        onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files.length) onArchivos(e.dataTransfer.files); }}>
+        <Upload size={28} color="rgba(255,255,255,0.3)" style={{ margin: '0 auto 10px', display: 'block' }} />
+        <p style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>Arrastra aquí o clic para seleccionar varias</p>
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>JPG, PNG, WEBP · máx 10MB cada una</p>
+      </Dropzone>
+
+      {archivosVarios.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px', maxHeight: '180px', overflowY: 'auto' }}>
+          {archivosVarios.map((file, i) => (
+            <div key={`${file.name}-${i}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '8px 12px' }}>
+              <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>📁 {file.name}</span>
+              <button type="button" onClick={() => onQuitarArchivo(i)}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '14px', marginLeft: '8px' }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {subiendoFoto && progresoVarios.total > 0 && (
+        <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginBottom: '12px', textAlign: 'center' }}>
+          Subiendo {progresoVarios.actual} de {progresoVarios.total}...
+        </p>
+      )}
+
+      <div style={{ display: 'flex', gap: '12px' }}>
+        <button type="button" onClick={onCancelar}
+          style={{ flex: 1, border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
+          Cancelar
+        </button>
+        <button type="button" onClick={onSubirVarias} disabled={subiendoFoto || archivosVarios.length === 0}
+          style={{ flex: 1, background: subiendoFoto || archivosVarios.length === 0 ? '#334155' : 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+          {subiendoFoto ? 'Subiendo...' : `+ Subir ${archivosVarios.length || ''} fotos`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // --- Modal: subir fotos a un evento (una o varias) ---
-// Todo el estado de subida (archivo, preview, progreso, etc.) vive aquí,
-// no en AdminPage — el modal es autocontenido.
-function ModalSubirFoto({ evento, onClose, onSubido }: {
+// Maneja su propio estado de subida (archivo, preview, progreso, etc.) —
+// no vive en AdminPage, el modal es autocontenido. Los dos formularios
+// (una/varias) viven en componentes propios para mantener la complejidad
+// cognitiva de este componente baja.
+function ModalSubirFoto({ evento, onClose, onSubido }: Readonly<{
   evento: Evento;
   onClose: () => void;
   onSubido: () => void;
-}) {
+}>) {
   const [modoSubida, setModoSubida] = useState<'una' | 'varias'>('una');
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [archivoFoto, setArchivoFoto] = useState<File | null>(null);
@@ -198,13 +411,19 @@ function ModalSubirFoto({ evento, onClose, onSubido }: {
     setUrlWatermark('');
   };
 
+  const manejarCambioUrl = (value: string) => {
+    setUrlFoto(value);
+    if (value) { setArchivoFoto(null); setPreviewFoto(''); }
+  };
+
+  const limpiarArchivoFoto = () => {
+    setArchivoFoto(null);
+    setPreviewFoto('');
+    setUrlWatermark('');
+  };
+
   const manejarArchivosVarios = (files: FileList) => {
-    const validos: File[] = [];
-    for (const file of Array.from(files)) {
-      if (!file.type.startsWith('image/')) { toast.error(`${file.name}: solo imágenes`); continue; }
-      if (file.size > 10 * 1024 * 1024) { toast.error(`${file.name}: máximo 10MB`); continue; }
-      validos.push(file);
-    }
+    const validos = filtrarArchivosValidos(files);
     if (validos.length === 0) return;
     setArchivosVarios(prev => [...prev, ...validos]);
   };
@@ -216,41 +435,14 @@ function ModalSubirFoto({ evento, onClose, onSubido }: {
   const subirFoto = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubiendoFoto(true);
-    try {
-      let urlFinal = urlFoto;
-      let urlWatermarkFinal = urlWatermark;
-
-      if (archivoFoto) {
-        const formData = new FormData();
-        formData.append('foto', archivoFoto);
-        const token = localStorage.getItem('token');
-        const res = await fetch('http://localhost:3001/api/upload/foto', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData
-        });
-        const data = await res.json();
-        if (!data.exito) throw new Error(data.mensaje);
-        urlFinal = data.datos.url;
-        urlWatermarkFinal = data.datos.url_watermark;
-      }
-
-      if (!urlFinal) { toast.error('Selecciona foto o URL'); setSubiendoFoto(false); return; }
-
-      await api.post('/fotos', {
-        event_id: evento.id,
-        gcs_original_url: urlFinal,
-        ...(urlWatermarkFinal && { gcs_watermark_url: urlWatermarkFinal })
-      });
-
+    const resultado = await ejecutarSubidaFoto({ eventoId: evento.id, archivoFoto, urlFoto, urlWatermark });
+    setSubiendoFoto(false);
+    if (resultado.ok) {
       toast.success('¡Foto subida con marca de agua!');
       onClose();
       onSubido();
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { mensaje?: string } } };
-      toast.error(error.response?.data?.mensaje || 'Error al subir foto');
-    } finally {
-      setSubiendoFoto(false);
+    } else {
+      toast.error(resultado.mensaje);
     }
   };
 
@@ -258,37 +450,19 @@ function ModalSubirFoto({ evento, onClose, onSubido }: {
     if (archivosVarios.length === 0) return;
     setSubiendoFoto(true);
     setProgresoVarios({ actual: 0, total: archivosVarios.length });
-    try {
-      const formData = new FormData();
-      archivosVarios.forEach((file) => formData.append('fotos', file));
-      const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/upload/fotos', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData
-      });
-      const data = await res.json();
-      if (!data.exito) throw new Error(data.mensaje);
-
-      setProgresoVarios({ actual: archivosVarios.length, total: archivosVarios.length });
-
-      await api.post('/fotos/multiple', {
-        event_id: evento.id,
-        fotos: data.datos.map((r: { url: string; url_watermark: string }) => ({
-          gcs_original_url: r.url,
-          gcs_watermark_url: r.url_watermark
-        }))
-      });
-
+    const resultado = await ejecutarSubidaFotosVarias({
+      eventoId: evento.id,
+      archivos: archivosVarios,
+      onArchivosSubidos: () => setProgresoVarios({ actual: archivosVarios.length, total: archivosVarios.length })
+    });
+    setSubiendoFoto(false);
+    setProgresoVarios({ actual: 0, total: 0 });
+    if (resultado.ok) {
       toast.success(`¡${archivosVarios.length} fotos subidas con marca de agua!`);
       onClose();
       onSubido();
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { mensaje?: string } } };
-      toast.error(error.response?.data?.mensaje || 'Error al subir las fotos');
-    } finally {
-      setSubiendoFoto(false);
-      setProgresoVarios({ actual: 0, total: 0 });
+    } else {
+      toast.error(resultado.mensaje);
     }
   };
 
@@ -324,94 +498,27 @@ function ModalSubirFoto({ evento, onClose, onSubido }: {
         </div>
 
         {modoSubida === 'una' ? (
-          <form onSubmit={subirFoto}>
-            <Dropzone
-              onAbrirSelector={() => document.getElementById('inputFotoAdmin')?.click()}
-              onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) manejarArchivo(f); }}>
-              <input id="inputFotoAdmin" type="file" accept="image/*" style={{ display: 'none' }}
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) manejarArchivo(f); }} />
-              {previewFoto ? (
-                <img src={previewFoto} alt="preview" style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '10px' }} />
-              ) : (
-                <>
-                  <Upload size={28} color="rgba(255,255,255,0.3)" style={{ margin: '0 auto 10px', display: 'block' }} />
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>Arrastra aquí o clic para seleccionar</p>
-                  <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>JPG, PNG, WEBP · máx 10MB</p>
-                </>
-              )}
-            </Dropzone>
-
-            {archivoFoto && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px' }}>
-                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>📁 {archivoFoto.name}</span>
-                <button type="button" onClick={() => { setArchivoFoto(null); setPreviewFoto(''); setUrlWatermark(''); }}
-                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-              <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
-              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>o ingresa URL</span>
-              <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
-            </div>
-
-            <input type="url" value={urlFoto}
-              onChange={(e) => { setUrlFoto(e.target.value); if (e.target.value) { setArchivoFoto(null); setPreviewFoto(''); } }}
-              placeholder="https://..."
-              style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box', marginBottom: '16px' }} />
-
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button type="button" onClick={onClose}
-                style={{ flex: 1, border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
-                Cancelar
-              </button>
-              <button type="submit" disabled={subiendoFoto || (!archivoFoto && !urlFoto)}
-                style={{ flex: 1, background: subiendoFoto || (!archivoFoto && !urlFoto) ? '#334155' : 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
-                {subiendoFoto ? 'Subiendo...' : '+ Subir foto'}
-              </button>
-            </div>
-          </form>
+          <FormSubirUna
+            archivoFoto={archivoFoto}
+            previewFoto={previewFoto}
+            urlFoto={urlFoto}
+            subiendoFoto={subiendoFoto}
+            onArchivo={manejarArchivo}
+            onUrlChange={manejarCambioUrl}
+            onQuitarArchivo={limpiarArchivoFoto}
+            onSubmit={subirFoto}
+            onCancelar={onClose}
+          />
         ) : (
-          <div>
-            <Dropzone
-              onAbrirSelector={() => document.getElementById('inputFotosVariasAdmin')?.click()}
-              onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files.length) manejarArchivosVarios(e.dataTransfer.files); }}>
-              <input id="inputFotosVariasAdmin" type="file" accept="image/*" multiple style={{ display: 'none' }}
-                onChange={(e) => { if (e.target.files?.length) manejarArchivosVarios(e.target.files); e.target.value = ''; }} />
-              <Upload size={28} color="rgba(255,255,255,0.3)" style={{ margin: '0 auto 10px', display: 'block' }} />
-              <p style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: '14px', marginBottom: '4px' }}>Arrastra aquí o clic para seleccionar varias</p>
-              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>JPG, PNG, WEBP · máx 10MB cada una</p>
-            </Dropzone>
-
-            {archivosVarios.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px', maxHeight: '180px', overflowY: 'auto' }}>
-                {archivosVarios.map((file, i) => (
-                  <div key={`${file.name}-${i}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '8px 12px' }}>
-                    <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>📁 {file.name}</span>
-                    <button type="button" onClick={() => quitarArchivoVarios(i)}
-                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '14px', marginLeft: '8px' }}>✕</button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {subiendoFoto && progresoVarios.total > 0 && (
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginBottom: '12px', textAlign: 'center' }}>
-                Subiendo {progresoVarios.actual} de {progresoVarios.total}...
-              </p>
-            )}
-
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button type="button" onClick={onClose}
-                style={{ flex: 1, border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}>
-                Cancelar
-              </button>
-              <button type="button" onClick={subirFotosVarias} disabled={subiendoFoto || archivosVarios.length === 0}
-                style={{ flex: 1, background: subiendoFoto || archivosVarios.length === 0 ? '#334155' : 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
-                {subiendoFoto ? 'Subiendo...' : `+ Subir ${archivosVarios.length || ''} fotos`}
-              </button>
-            </div>
-          </div>
+          <FormSubirVarias
+            archivosVarios={archivosVarios}
+            subiendoFoto={subiendoFoto}
+            progresoVarios={progresoVarios}
+            onArchivos={manejarArchivosVarios}
+            onQuitarArchivo={quitarArchivoVarios}
+            onSubirVarias={subirFotosVarias}
+            onCancelar={onClose}
+          />
         )}
       </div>
     </div>
@@ -421,11 +528,11 @@ function ModalSubirFoto({ evento, onClose, onSubido }: {
 // --- Modal: editar evento (nombre, ciudad, fecha, tipo, portada y precios
 // reunidos en un solo formulario) ---
 // Carga las fotos del evento (para elegir portada) apenas se monta.
-function ModalEditarEvento({ evento, onClose, onGuardado }: {
+function ModalEditarEvento({ evento, onClose, onGuardado }: Readonly<{
   evento: Evento;
   onClose: () => void;
   onGuardado: () => void;
-}) {
+}>) {
   const [formEditar, setFormEditar] = useState({
     nombre: '', ciudad: '', fecha: '', tipo: 'RUNNING',
     cover_url: '', precio_individual: '', precio_photopass: ''
@@ -521,14 +628,14 @@ function ModalEditarEvento({ evento, onClose, onGuardado }: {
         <form onSubmit={guardarEditar}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
             <div>
-              <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Nombre</label>
-              <input type="text" required value={formEditar.nombre}
+              <label htmlFor="editar-nombre" style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Nombre</label>
+              <input id="editar-nombre" type="text" required value={formEditar.nombre}
                 onChange={(e) => setFormEditar({ ...formEditar, nombre: e.target.value })}
                 style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }} />
             </div>
             <div>
-              <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Ciudad</label>
-              <input type="text" required value={formEditar.ciudad}
+              <label htmlFor="editar-ciudad" style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Ciudad</label>
+              <input id="editar-ciudad" type="text" required value={formEditar.ciudad}
                 onChange={(e) => setFormEditar({ ...formEditar, ciudad: e.target.value })}
                 style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }} />
             </div>
@@ -536,14 +643,14 @@ function ModalEditarEvento({ evento, onClose, onGuardado }: {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
             <div>
-              <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Fecha</label>
-              <input type="datetime-local" required value={formEditar.fecha}
+              <label htmlFor="editar-fecha" style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Fecha</label>
+              <input id="editar-fecha" type="datetime-local" required value={formEditar.fecha}
                 onChange={(e) => setFormEditar({ ...formEditar, fecha: e.target.value })}
                 style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }} />
             </div>
             <div>
-              <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Tipo</label>
-              <select value={formEditar.tipo} onChange={(e) => setFormEditar({ ...formEditar, tipo: e.target.value })}
+              <label htmlFor="editar-tipo" style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>Tipo</label>
+              <select id="editar-tipo" value={formEditar.tipo} onChange={(e) => setFormEditar({ ...formEditar, tipo: e.target.value })}
                 style={{ width: '100%', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '11px 14px', fontSize: '14px', color: 'white', outline: 'none', boxSizing: 'border-box' }}>
                 <option value="RUNNING">Running</option>
                 <option value="ATLETISMO">Atletismo</option>
@@ -555,7 +662,7 @@ function ModalEditarEvento({ evento, onClose, onGuardado }: {
           </div>
 
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>Portada</label>
+            <p style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>Portada</p>
             {contenidoPortada}
           </div>
 
@@ -563,14 +670,14 @@ function ModalEditarEvento({ evento, onClose, onGuardado }: {
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase' }}>Precios</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '8px' }}>Individual ($)</label>
-                <input type="number" step="0.01" min="0.99" required value={formEditar.precio_individual}
+                <label htmlFor="editar-precio-individual" style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '8px' }}>Individual ($)</label>
+                <input id="editar-precio-individual" type="number" step="0.01" min="0.99" required value={formEditar.precio_individual}
                   onChange={(e) => setFormEditar({ ...formEditar, precio_individual: e.target.value })}
                   style={{ width: '100%', backgroundColor: 'rgba(14,165,233,0.1)', border: '2px solid rgba(14,165,233,0.3)', borderRadius: '12px', padding: '12px', fontSize: '20px', fontWeight: 900, color: '#38bdf8', outline: 'none', boxSizing: 'border-box', textAlign: 'center' }} />
               </div>
               <div>
-                <label style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '8px' }}>Photopass ($)</label>
-                <input type="number" step="0.01" min="0.99" required value={formEditar.precio_photopass}
+                <label htmlFor="editar-precio-photopass" style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '8px' }}>Photopass ($)</label>
+                <input id="editar-precio-photopass" type="number" step="0.01" min="0.99" required value={formEditar.precio_photopass}
                   onChange={(e) => setFormEditar({ ...formEditar, precio_photopass: e.target.value })}
                   style={{ width: '100%', backgroundColor: 'rgba(99,102,241,0.1)', border: '2px solid rgba(99,102,241,0.3)', borderRadius: '12px', padding: '12px', fontSize: '20px', fontWeight: 900, color: '#a78bfa', outline: 'none', boxSizing: 'border-box', textAlign: 'center' }} />
               </div>

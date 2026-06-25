@@ -36,7 +36,7 @@ export default function RegistroPage() {
     setCargando(true);
     try {
       const { data } = await api.post('/auth/registro', form);
-      guardarToken(data.datos.token);
+      guardarToken(data.datos.token, data.datos.usuario.role);
       setEmailRegistrado(form.email);
 
       // En desarrollo el código viene en la respuesta
@@ -135,10 +135,11 @@ export default function RegistroPage() {
             <form onSubmit={handleSubmit}>
               {/* Nombre */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
+                <label htmlFor="registro-nombre" style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
                   Nombre completo
                 </label>
                 <input
+                  id="registro-nombre"
                   type="text" required value={form.nombre}
                   onChange={(e) => setForm({ ...form, nombre: e.target.value })}
                   placeholder="Juan Pérez"
@@ -150,10 +151,11 @@ export default function RegistroPage() {
 
               {/* Email */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
+                <label htmlFor="registro-email" style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
                   Email
                 </label>
                 <input
+                  id="registro-email"
                   type="email" required value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="tu@email.com"
@@ -165,10 +167,11 @@ export default function RegistroPage() {
 
               {/* Teléfono */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
+                <label htmlFor="registro-phone" style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
                   Teléfono <span style={{ color: '#94a3b8', fontWeight: 400 }}>(opcional)</span>
                 </label>
                 <input
+                  id="registro-phone"
                   type="tel" value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   placeholder="0991234567"
@@ -180,11 +183,12 @@ export default function RegistroPage() {
 
               {/* Contraseña */}
               <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
+                <label htmlFor="registro-password" style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
                   Contraseña
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
+                    id="registro-password"
                     type={verPassword ? 'text' : 'password'} required value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
                     placeholder="Mínimo 6 caracteres"
@@ -255,10 +259,11 @@ export default function RegistroPage() {
 
             <form onSubmit={verificarCodigo}>
               <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '8px', textAlign: 'center' }}>
+                <label htmlFor="registro-codigo" style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '8px', textAlign: 'center' }}>
                   Código de verificación
                 </label>
                 <input
+                  id="registro-codigo"
                   type="text" maxLength={6} value={codigo}
                   onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
                   placeholder="000000"

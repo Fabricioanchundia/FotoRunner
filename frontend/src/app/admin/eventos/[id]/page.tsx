@@ -197,12 +197,10 @@ export default function AdminEventoFotosPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
               {fotos.map((foto) => (
                 <div key={foto.id} style={{ backgroundColor: '#1d1a38', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(165,180,252,0.1)' }}>
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    style={{ position: 'relative', aspectRatio: '4/3', cursor: 'pointer' }}
-                    onClick={() => setFotoAmpliada(foto)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFotoAmpliada(foto); } }}>
+                  <button
+                    type="button"
+                    style={{ width: '100%', padding: 0, border: 'none', font: 'inherit', color: 'inherit', position: 'relative', aspectRatio: '4/3', cursor: 'pointer' }}
+                    onClick={() => setFotoAmpliada(foto)}>
                     <img
                       src={foto.gcs_watermark_url || foto.gcs_original_url}
                       alt="foto"
@@ -217,7 +215,7 @@ export default function AdminEventoFotosPage() {
                         🔒 WM
                       </div>
                     )}
-                  </div>
+                  </button>
                   <div style={{ padding: '10px 12px' }}>
                     <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginBottom: '8px' }}>
                       {new Date(foto.created_at).toLocaleDateString('es-EC')}
@@ -249,18 +247,16 @@ export default function AdminEventoFotosPage() {
               </p>
             </div>
             <form onSubmit={subirFoto}>
-              <div
-                role="button"
-                tabIndex={0}
+              <input id="inputFotoEvento" type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) manejarArchivo(f); }} />
+              <button
+                type="button"
                 onClick={() => document.getElementById('inputFotoEvento')?.click()}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('inputFotoEvento')?.click(); } }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) manejarArchivo(f); }}
-                style={{ border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '14px', padding: '28px', textAlign: 'center', cursor: 'pointer', marginBottom: '16px', backgroundColor: 'rgba(255,255,255,0.02)' }}
+                style={{ width: '100%', border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '14px', padding: '28px', textAlign: 'center', cursor: 'pointer', marginBottom: '16px', backgroundColor: 'rgba(255,255,255,0.02)', font: 'inherit', color: 'inherit' }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0ea5e9'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}>
-                <input id="inputFotoEvento" type="file" accept="image/*" style={{ display: 'none' }}
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) manejarArchivo(f); }} />
                 {previewFoto ? (
                   <img src={previewFoto} alt="preview" style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '10px' }} />
                 ) : (
@@ -270,7 +266,7 @@ export default function AdminEventoFotosPage() {
                     <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '12px' }}>JPG, PNG, WEBP · máx 10MB</p>
                   </>
                 )}
-              </div>
+              </button>
 
               {archivoFoto && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px' }}>
@@ -308,13 +304,13 @@ export default function AdminEventoFotosPage() {
 
       {/* MODAL FOTO AMPLIADA */}
       {fotoAmpliada && (
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setFotoAmpliada(null)}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') { setFotoAmpliada(null); } }}
-          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.92)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div role="presentation" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '100%', position: 'relative' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <button
+            type="button"
+            aria-label="Cerrar vista previa"
+            onClick={() => setFotoAmpliada(null)}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none', padding: 0, backgroundColor: 'rgba(0,0,0,0.92)', cursor: 'pointer' }} />
+          <div style={{ position: 'relative', zIndex: 1, maxWidth: '800px', width: '100%' }}>
             <img src={fotoAmpliada.gcs_watermark_url || fotoAmpliada.gcs_original_url}
               alt="Foto ampliada" style={{ width: '100%', borderRadius: '16px' }}
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />

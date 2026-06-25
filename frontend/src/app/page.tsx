@@ -16,6 +16,8 @@ interface Evento {
   _count: { fotos: number };
 }
 
+const SKELETON_KEYS_HOME = Array.from({ length: 8 }, (_, i) => `sk-${i}`);
+
 export default function Home() {
   const [busqueda, setBusqueda] = useState('');
   const [eventos, setEventos] = useState<Evento[]>([]);
@@ -44,6 +46,69 @@ export default function Home() {
     if (tipo === 'CICLISMO') return '#6366f1';
     return '#8b5cf6';
   };
+
+  let contenidoGalerias;
+  if (cargando) {
+    contenidoGalerias = (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
+        {SKELETON_KEYS_HOME.map((key) => (
+          <div key={key}>
+            <div style={{ backgroundColor: '#f1f5f9', borderRadius: '16px', aspectRatio: '4/3', marginBottom: '12px' }} />
+            <div style={{ backgroundColor: '#f1f5f9', height: '16px', borderRadius: '8px', marginBottom: '6px' }} />
+            <div style={{ backgroundColor: '#f8fafc', height: '12px', borderRadius: '8px', width: '50%' }} />
+          </div>
+        ))}
+      </div>
+    );
+  } else if (eventosFiltrados.length === 0) {
+    contenidoGalerias = (
+      <div style={{ textAlign: 'center', padding: '80px', color: '#94a3b8' }}>
+        <p style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px', color: '#475569' }}>No hay eventos disponibles</p>
+        <p style={{ fontSize: '14px' }}>Los eventos aparecerán aquí pronto</p>
+      </div>
+    );
+  } else {
+    contenidoGalerias = (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
+        {eventosFiltrados.map((evento) => (
+          <Link key={evento.id} href={`/eventos/${evento.id}`} style={{ textDecoration: 'none' }}>
+            <div style={{ cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' }}>
+              <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '16px', aspectRatio: '4/3', marginBottom: '12px', backgroundColor: '#f1f5f9' }}>
+                {evento.cover_url ? (
+                  <img src={evento.cover_url} alt={evento.nombre}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #0f172a, #1e1b4b)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '13px', fontWeight: 700 }}>SIN IMAGEN</span>
+                  </div>
+                )}
+                <span style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: colorTipo(evento.tipo), color: 'white', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '50px' }}>
+                  {evento.tipo}
+                </span>
+                {evento._count.fotos > 0 && (
+                  <span style={{ position: 'absolute', bottom: '10px', right: '10px', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '50px' }}>
+                    {evento._count.fotos} fotos
+                  </span>
+                )}
+              </div>
+              <h3 style={{ fontWeight: 800, color: '#0f172a', fontSize: '15px', lineHeight: 1.3, marginBottom: '4px' }}>
+                {evento.nombre}
+              </h3>
+              <div style={{ display: 'flex', gap: '12px', color: '#94a3b8', fontSize: '12px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <MapPin size={11} /> {evento.ciudad}
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Calendar size={11} />
+                  {new Date(evento.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                </span>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    );
+  }
 
   if (cargando) {
     return <LoadingScreen variant="cliente" />;
@@ -135,69 +200,7 @@ export default function Home() {
           </span>
         </div>
 
-        {cargando ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
-            {[...Array(8)].map((_, i) => (
-              <div key={i}>
-                <div style={{ backgroundColor: '#f1f5f9', borderRadius: '16px', aspectRatio: '4/3', marginBottom: '12px' }} />
-                <div style={{ backgroundColor: '#f1f5f9', height: '16px', borderRadius: '8px', marginBottom: '6px' }} />
-                <div style={{ backgroundColor: '#f8fafc', height: '12px', borderRadius: '8px', width: '50%' }} />
-              </div>
-            ))}
-          </div>
-        ) : eventosFiltrados.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '80px', color: '#94a3b8' }}>
-            <p style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px', color: '#475569' }}>No hay eventos disponibles</p>
-            <p style={{ fontSize: '14px' }}>Los eventos aparecerán aquí pronto</p>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
-            {eventosFiltrados.map((evento) => (
-              <Link key={evento.id} href={`/eventos/${evento.id}`} style={{ textDecoration: 'none' }}>
-                <div style={{ cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)';
-                    (e.currentTarget as HTMLDivElement).style.boxShadow = '0 12px 32px rgba(14,165,233,0.15)';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
-                    (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
-                  }}>
-                  <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '16px', aspectRatio: '4/3', marginBottom: '12px', backgroundColor: '#f1f5f9' }}>
-                    {evento.cover_url ? (
-                      <img src={evento.cover_url} alt={evento.nombre}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #0f172a, #1e1b4b)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '13px', fontWeight: 700 }}>SIN IMAGEN</span>
-                      </div>
-                    )}
-                    <span style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: colorTipo(evento.tipo), color: 'white', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '50px' }}>
-                      {evento.tipo}
-                    </span>
-                    {evento._count.fotos > 0 && (
-                      <span style={{ position: 'absolute', bottom: '10px', right: '10px', backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', fontSize: '11px', fontWeight: 600, padding: '4px 10px', borderRadius: '50px' }}>
-                        {evento._count.fotos} fotos
-                      </span>
-                    )}
-                  </div>
-                  <h3 style={{ fontWeight: 800, color: '#0f172a', fontSize: '15px', lineHeight: 1.3, marginBottom: '4px' }}>
-                    {evento.nombre}
-                  </h3>
-                  <div style={{ display: 'flex', gap: '12px', color: '#94a3b8', fontSize: '12px' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <MapPin size={11} /> {evento.ciudad}
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Calendar size={11} />
-                      {new Date(evento.fecha).toLocaleDateString('es-EC', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
+        {contenidoGalerias}
       </section>
 
       {/* CÓMO FUNCIONA */}

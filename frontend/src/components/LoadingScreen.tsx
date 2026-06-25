@@ -1,7 +1,7 @@
 'use client';
 
 interface LoadingScreenProps {
-  variant?: 'cliente' | 'admin';
+  readonly variant?: 'cliente' | 'admin';
 }
 
 export default function LoadingScreen({ variant = 'cliente' }: LoadingScreenProps) {

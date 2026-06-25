@@ -48,37 +48,37 @@ function formatearFecha(fechaIso: string): string {
 }
 
 // --- Una foto de la galería principal ---
-// Extraída del componente principal: el div de la imagen necesita
-// role/tabIndex/teclado porque no es un elemento nativo interactivo, y
-// sacar esta lógica de ahí baja la complejidad cognitiva de EventoPage.
-function FotoCard({ foto, seleccionada, onAmpliar, onAlternarSeleccion }: {
+// El botón de ampliar y el de seleccionar son hermanos (no uno dentro del
+// otro) porque un <button> no puede contener otro <button> anidado.
+function FotoCard({ foto, seleccionada, onAmpliar, onAlternarSeleccion }: Readonly<{
   foto: Foto;
   seleccionada: boolean;
   onAmpliar: (foto: Foto) => void;
   onAlternarSeleccion: (foto: Foto, e: React.MouseEvent) => void;
-}) {
+}>) {
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={() => onAmpliar(foto)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAmpliar(foto); } }}
       style={{
         position: 'relative',
         borderRadius: '16px',
         overflow: 'hidden',
         aspectRatio: '3/2',
-        cursor: 'pointer',
         backgroundColor: '#e2e8f0',
         border: seleccionada ? '3px solid #93c5fd' : '3px solid transparent',
         boxShadow: seleccionada ? '0 4px 16px rgba(59,130,246,0.25)' : '0 2px 8px rgba(0,0,0,0.06)',
       }}>
-      <img
-        src={foto.gcs_watermark_url || foto.gcs_original_url}
-        alt="Foto del evento"
-        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-      />
-      <div style={WATERMARK_STYLE} />
+      <button
+        type="button"
+        aria-label="Ver foto ampliada"
+        onClick={() => onAmpliar(foto)}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none', padding: 0, background: 'none', cursor: 'pointer', zIndex: 1 }}>
+        <img
+          src={foto.gcs_watermark_url || foto.gcs_original_url}
+          alt="Foto del evento"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+        <div style={WATERMARK_STYLE} />
+      </button>
       <button
         onClick={(e) => onAlternarSeleccion(foto, e)}
         aria-label={seleccionada ? 'Quitar selección' : 'Seleccionar foto'}
@@ -102,13 +102,12 @@ function FotoCard({ foto, seleccionada, onAmpliar, onAlternarSeleccion }: {
 // gesto de clic del usuario (el botón "Buscar mis fotos con mi rostro"
 // en EventoPage); si se pide desde un efecto que corre después de montar
 // este modal, Safari/iOS puede rechazar el permiso por haber perdido el
-// contexto de interacción del usuario. Por eso todo el estado y los
-// handlers reales siguen viviendo en EventoPage; este componente solo
+// contexto de interacción del usuario. Por eso el estado y los handlers reales siguen viviendo en EventoPage; este componente solo
 // recibe props y dibuja.
 function ModalCamara({
   fotoCapturada, procesando, onSetVideoRef, onSetCanvasRef,
   onCerrar, onTomarFoto, onReintentar, onBuscarConSelfie
-}: {
+}: Readonly<{
   fotoCapturada: string | null;
   procesando: boolean;
   onSetVideoRef: (el: HTMLVideoElement | null) => void;
@@ -117,13 +116,20 @@ function ModalCamara({
   onTomarFoto: () => void;
   onReintentar: () => void;
   onBuscarConSelfie: () => void;
-}) {
+}>) {
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
       <div style={{ backgroundColor: 'white', borderRadius: '24px', overflow: 'hidden', width: '100%', maxWidth: '820px', display: 'flex', position: 'relative' }}>
         <button onClick={onCerrar} style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 10, width: '32px', height: '32px', backgroundColor: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', color: 'white', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
         <div style={{ flex: 1, backgroundColor: '#000', position: 'relative', minHeight: '380px' }}>
-          {!fotoCapturada ? (
+          {fotoCapturada ? (
+            <>
+              <img src={fotoCapturada} alt="Selfie" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <button onClick={onReintentar} style={{ position: 'absolute', bottom: '20px', right: '20px', backgroundColor: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: '44px', height: '44px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <RotateCcw size={20} />
+              </button>
+            </>
+          ) : (
             <>
               <video ref={onSetVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)' }}>
@@ -134,13 +140,6 @@ function ModalCamara({
                 </button>
               </div>
             </>
-          ) : (
-            <>
-              <img src={fotoCapturada} alt="Selfie" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              <button onClick={onReintentar} style={{ position: 'absolute', bottom: '20px', right: '20px', backgroundColor: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: '44px', height: '44px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <RotateCcw size={20} />
-              </button>
-            </>
           )}
           <canvas ref={onSetCanvasRef} style={{ display: 'none' }} />
         </div>
@@ -148,10 +147,10 @@ function ModalCamara({
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>📸</div>
             <p style={{ color: '#0f172a', fontWeight: 700, fontSize: '16px', marginBottom: '8px' }}>
-              {!fotoCapturada ? 'Tómate una selfie' : '¿Todo bien?'}
+              {fotoCapturada ? '¿Todo bien?' : 'Tómate una selfie'}
             </p>
             <p style={{ color: '#64748b', fontSize: '13px', lineHeight: 1.5 }}>
-              {!fotoCapturada ? 'Incluye a todas las personas que te acompañaron' : 'Usaremos esta foto para encontrar tus imágenes'}
+              {fotoCapturada ? 'Usaremos esta foto para encontrar tus imágenes' : 'Incluye a todas las personas que te acompañaron'}
             </p>
           </div>
           {fotoCapturada && (
@@ -170,23 +169,23 @@ function ModalCamara({
 // watermark a la izquierda, panel informativo a la derecha, flechas de
 // navegación a los costados) — autocontenido, solo necesita la foto y
 // callbacks. ---
-function ModalFotoAmpliada({ foto, hayMultiples, onClose, onNavegar, onAlternarSeleccion }: {
+function ModalFotoAmpliada({ foto, hayMultiples, onClose, onNavegar, onAlternarSeleccion }: Readonly<{
   foto: Foto;
   hayMultiples: boolean;
   onClose: () => void;
   onNavegar: (direccion: 1 | -1) => void;
   onAlternarSeleccion: (foto: Foto, e: React.MouseEvent) => void;
-}) {
+}>) {
   const seleccionada = estaEnCarrito(foto.id);
   const tamano = formatearTamano(foto.tamano_bytes);
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClose}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') { onClose(); } }}
-      style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <button
+        type="button"
+        aria-label="Cerrar vista previa"
+        onClick={onClose}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none', padding: 0, backgroundColor: 'rgba(0,0,0,0.6)', cursor: 'pointer' }} />
 
       {hayMultiples && (
         <button onClick={(e) => { e.stopPropagation(); onNavegar(-1); }}
@@ -196,8 +195,8 @@ function ModalFotoAmpliada({ foto, hayMultiples, onClose, onNavegar, onAlternarS
         </button>
       )}
 
-      <div role="presentation" onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '920px', width: '100%', maxHeight: '88vh', backgroundColor: 'white', borderRadius: '20px', overflow: 'hidden', display: 'flex', boxShadow: '0 20px 60px rgba(0,0,0,0.4)', position: 'relative' }}>
+      <div
+        style={{ position: 'relative', zIndex: 1, maxWidth: '920px', width: '100%', maxHeight: '88vh', backgroundColor: 'white', borderRadius: '20px', overflow: 'hidden', display: 'flex', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
 
         <div style={{ position: 'relative', flex: '1 1 60%', backgroundColor: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '320px' }}>
           <img
@@ -529,19 +528,18 @@ export default function EventoPage() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
               {misFotos.map((foto) => (
-                <div key={foto.id}
-                  role="button"
-                  tabIndex={0}
+                <button
+                  key={foto.id}
+                  type="button"
                   onClick={() => setFotoAmpliada(foto)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFotoAmpliada(foto); } }}
-                  style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', aspectRatio: '3/2', cursor: 'pointer', border: '2px solid #16a34a' }}>
+                  style={{ width: '100%', padding: 0, border: '2px solid #16a34a', font: 'inherit', color: 'inherit', position: 'relative', borderRadius: '12px', overflow: 'hidden', aspectRatio: '3/2', cursor: 'pointer' }}>
                   <img src={foto.gcs_watermark_url || foto.gcs_original_url} alt="Mi foto"
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                   <div style={WATERMARK_STYLE} />
                   <div style={{ position: 'absolute', bottom: '6px', right: '6px', backgroundColor: '#16a34a', color: 'white', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px', zIndex: 20 }}>
                     ✓ Tu foto
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -575,7 +573,7 @@ export default function EventoPage() {
         <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100, backgroundColor: '#0f172a', padding: '18px', display: 'flex', justifyContent: 'center' }}>
           <button onClick={continuar}
             style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'white', color: '#0f172a', border: 'none', padding: '14px 32px', borderRadius: '50px', fontWeight: 800, fontSize: '15px', cursor: 'pointer' }}>
-            Continuar
+            <span>Continuar</span>
             <span style={{ position: 'relative', display: 'flex' }}>
               <ShoppingCart size={18} />
               <span style={{ position: 'absolute', top: '-8px', right: '-10px', width: '17px', height: '17px', backgroundColor: '#ef4444', borderRadius: '50%', color: 'white', fontSize: '9px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

@@ -26,6 +26,399 @@ interface Orden {
   evento: { nombre: string; ciudad: string };
 }
 
+// --- Modal de cámara para la selfie de reconocimiento facial ---
+// Puramente presentacional: recibe los refs y handlers ya creados en
+// PerfilPage. getUserMedia() se sigue pidiendo en el clic original
+// (abrirCamara), no aquí, para no perder el gesto de usuario.
+function ModalCamaraPerfil({
+  fotoCapturada, guardandoSelfie, videoRef, canvasRef,
+  onCerrar, onTomarFoto, onReintentar, onGuardar
+}: Readonly<{
+  fotoCapturada: string | null;
+  guardandoSelfie: boolean;
+  videoRef: React.RefObject<HTMLVideoElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
+  onCerrar: () => void;
+  onTomarFoto: () => void;
+  onReintentar: () => void;
+  onGuardar: () => void;
+}>) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.88)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{ backgroundColor: 'white', borderRadius: '24px', overflow: 'hidden', width: '100%', maxWidth: '720px', display: 'flex', position: 'relative' }}>
+        <button onClick={onCerrar}
+          style={{ position: 'absolute', top: '14px', left: '14px', zIndex: 10, width: '30px', height: '30px', backgroundColor: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', color: 'white', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          ✕
+        </button>
+        <div style={{ flex: 1, backgroundColor: '#000', position: 'relative', minHeight: '360px' }}>
+          {fotoCapturada ? (
+            <>
+              <img src={fotoCapturada} alt="Selfie" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <button onClick={onReintentar}
+                style={{ position: 'absolute', bottom: '20px', right: '20px', backgroundColor: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: '44px', height: '44px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <RotateCcw size={18} />
+              </button>
+            </>
+          ) : (
+            <>
+              <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)' }}>
+                <button onClick={onTomarFoto}
+                  style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: 'white', border: '3px solid rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Camera size={22} color="white" />
+                  </div>
+                </button>
+              </div>
+            </>
+          )}
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
+        </div>
+        <div style={{ width: '240px', padding: '28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '14px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <Camera size={22} color="white" />
+            </div>
+            <p style={{ color: '#0f172a', fontWeight: 800, fontSize: '15px', marginBottom: '6px' }}>
+              {fotoCapturada ? '¿Se ve bien?' : 'Tómate una selfie'}
+            </p>
+            <p style={{ color: '#64748b', fontSize: '12px', lineHeight: 1.5 }}>
+              {fotoCapturada ? 'Confirma tu selfie para activar el reconocimiento facial' : 'Esta foto activa el reconocimiento automático en los eventos'}
+            </p>
+          </div>
+          {fotoCapturada && (
+            <button onClick={onGuardar} disabled={guardandoSelfie}
+              style={{ width: '100%', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '14px', cursor: guardandoSelfie ? 'not-allowed' : 'pointer', opacity: guardandoSelfie ? 0.7 : 1 }}>
+              {guardandoSelfie ? 'Guardando...' : 'Confirmar'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Tarjeta: información personal ---
+function TarjetaInfoPersonal({ usuario }: Readonly<{ usuario: Usuario }>) {
+  const camposInfo = [
+    { label: 'NOMBRE COMPLETO', value: usuario.nombre },
+    { label: 'CORREO ELECTRÓNICO', value: usuario.email },
+    { label: 'TELÉFONO', value: usuario.phone || 'No registrado' },
+    { label: 'MIEMBRO DESDE', value: new Date(usuario.created_at).toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' }) },
+  ];
+
+  return (
+    <div style={{ background: 'white', borderRadius: '20px', padding: '28px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0' }}>
+      <h2 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Camera size={14} color="white" />
+        </div>
+        Información personal
+      </h2>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+        {camposInfo.map((campo) => (
+          <div key={campo.label} style={{ padding: '14px 16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #f0f0f0' }}>
+            <p style={{ color: '#94a3b8', fontSize: '10px', fontWeight: 700, marginBottom: '6px', letterSpacing: '0.8px' }}>{campo.label}</p>
+            <p style={{ color: '#0f172a', fontSize: '14px', fontWeight: 700 }}>{campo.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// --- Tarjeta: reconocimiento facial ---
+function TarjetaReconocimientoFacial({ usuario, onAbrirCamara }: Readonly<{ usuario: Usuario; onAbrirCamara: () => void }>) {
+  return (
+    <div style={{ background: 'white', borderRadius: '20px', padding: '28px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '18px' }}>
+        <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: usuario.avatar_url ? 'linear-gradient(135deg, #0ea5e9, #6366f1)' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Camera size={22} color={usuario.avatar_url ? 'white' : '#94a3b8'} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', margin: 0 }}>Reconocimiento facial</h3>
+            <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '50px', backgroundColor: usuario.avatar_url ? '#f0fdf4' : '#fef9c3', color: usuario.avatar_url ? '#16a34a' : '#854d0e', border: `1px solid ${usuario.avatar_url ? '#bbf7d0' : '#fde68a'}` }}>
+              {usuario.avatar_url ? '✓ Activo' : '⏳ Pendiente'}
+            </span>
+          </div>
+          <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '16px', lineHeight: 1.6 }}>
+            {usuario.avatar_url ? 'Tu selfie está activa. Te encontramos automáticamente en los eventos.' : 'Activa el reconocimiento facial para encontrarte automáticamente en las fotos de tus carreras.'}
+          </p>
+          <button onClick={onAbrirCamara}
+            style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
+            <Camera size={14} />
+            {usuario.avatar_url ? 'Actualizar selfie' : 'Activar ahora'}
+          </button>
+        </div>
+        {usuario.avatar_url && (
+          <div style={{ width: '68px', height: '68px', borderRadius: '12px', overflow: 'hidden', border: '2px solid #0ea5e9', flexShrink: 0 }}>
+            <img src={usuario.avatar_url} alt="selfie" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- Tarjeta: seguridad y verificaciones (email, teléfono, contraseña) ---
+// --- Fila de email + panel de verificación inline ---
+function FilaEmailSeguridad({
+  usuario, mostrarVerifEmail, codigoEmail, setCodigoEmail, enviandoEmail, verificandoEmail, codigoDevEmail,
+  onEnviarCodigoEmail, onVerificarEmail, onCancelarVerifEmail
+}: Readonly<{
+  usuario: Usuario;
+  mostrarVerifEmail: boolean;
+  codigoEmail: string;
+  setCodigoEmail: (v: string) => void;
+  enviandoEmail: boolean;
+  verificandoEmail: boolean;
+  codigoDevEmail: string;
+  onEnviarCodigoEmail: () => void;
+  onVerificarEmail: () => void;
+  onCancelarVerifEmail: () => void;
+}>) {
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f0f0f0', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: usuario.email_verified ? 'linear-gradient(135deg, #22c55e, #16a34a)' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Mail size={18} color={usuario.email_verified ? 'white' : '#94a3b8'} />
+          </div>
+          <div>
+            <p style={{ color: '#0f172a', fontSize: '14px', fontWeight: 700, marginBottom: '2px' }}>Correo electrónico</p>
+            <p style={{ color: '#64748b', fontSize: '12px' }}>{usuario.email}</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {usuario.email_verified ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#f0fdf4', color: '#16a34a', fontSize: '12px', fontWeight: 700, padding: '6px 14px', borderRadius: '50px', border: '1px solid #bbf7d0' }}>
+              <CheckCircle size={13} /> Verificado
+            </span>
+          ) : (
+            <>
+              <span style={{ background: '#fef9c3', color: '#854d0e', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '50px', border: '1px solid #fde68a' }}>
+                Sin verificar
+              </span>
+              <button onClick={onEnviarCodigoEmail} disabled={enviandoEmail}
+                style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: 700, cursor: enviandoEmail ? 'not-allowed' : 'pointer', opacity: enviandoEmail ? 0.7 : 1 }}>
+                {enviandoEmail ? 'Enviando...' : 'Verificar ahora'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Modal verificación email inline */}
+      {mostrarVerifEmail && !usuario.email_verified && (
+        <div style={{ padding: '20px', background: 'linear-gradient(135deg, rgba(14,165,233,0.05), rgba(99,102,241,0.05))', borderRadius: '14px', border: '1px solid rgba(14,165,233,0.2)' }}>
+          <p style={{ color: '#0f172a', fontSize: '14px', fontWeight: 700, marginBottom: '6px' }}>
+            Ingresa el código enviado a <span style={{ color: '#0ea5e9' }}>{usuario.email}</span>
+          </p>
+          {codigoDevEmail && (
+            <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', color: '#92400e', marginBottom: '12px' }}>
+              Modo desarrollo — Código: <strong>{codigoDevEmail}</strong>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="text" maxLength={6} value={codigoEmail}
+              onChange={(e) => setCodigoEmail(e.target.value.replace(/\D/g, ''))}
+              placeholder="000000"
+              style={{ width: '140px', border: '2px solid #e2e8f0', borderRadius: '10px', padding: '10px 14px', fontSize: '20px', fontWeight: 800, color: '#0f172a', outline: 'none', textAlign: 'center', letterSpacing: '6px', backgroundColor: 'white' }}
+              onFocus={(e) => { e.target.style.borderColor = '#0ea5e9'; }}
+              onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; }}
+            />
+            <button onClick={onVerificarEmail} disabled={verificandoEmail || codigoEmail.length !== 6}
+              style={{ background: codigoEmail.length === 6 ? 'linear-gradient(135deg, #0ea5e9, #6366f1)' : '#e2e8f0', color: codigoEmail.length === 6 ? 'white' : '#94a3b8', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 700, cursor: codigoEmail.length === 6 ? 'pointer' : 'not-allowed' }}>
+              {verificandoEmail ? 'Verificando...' : 'Confirmar'}
+            </button>
+            <button onClick={onCancelarVerifEmail}
+              style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>
+              Cancelar
+            </button>
+          </div>
+          <button onClick={onEnviarCodigoEmail} disabled={enviandoEmail}
+            style={{ background: 'none', border: 'none', color: '#0ea5e9', fontSize: '12px', fontWeight: 600, cursor: 'pointer', marginTop: '8px', padding: 0 }}>
+            {enviandoEmail ? 'Enviando...' : '¿No recibiste el código? Reenviar'}
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+// --- Fila de teléfono ---
+function FilaTelefonoSeguridad({ usuario }: Readonly<{ usuario: Usuario }>) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f0f0f0', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: usuario.phone ? 'linear-gradient(135deg, #22c55e, #16a34a)' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Phone size={18} color={usuario.phone ? 'white' : '#94a3b8'} />
+        </div>
+        <div>
+          <p style={{ color: '#0f172a', fontSize: '14px', fontWeight: 700, marginBottom: '2px' }}>Teléfono</p>
+          <p style={{ color: '#64748b', fontSize: '12px' }}>{usuario.phone || 'No registrado'}</p>
+        </div>
+      </div>
+      {usuario.phone ? (
+        <span style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#f0fdf4', color: '#16a34a', fontSize: '12px', fontWeight: 700, padding: '6px 14px', borderRadius: '50px', border: '1px solid #bbf7d0' }}>
+          <CheckCircle size={13} /> Registrado
+        </span>
+      ) : (
+        <span style={{ background: '#f1f5f9', color: '#94a3b8', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '50px' }}>
+          No agregado
+        </span>
+      )}
+    </div>
+  );
+}
+
+function TarjetaSeguridad({
+  usuario, mostrarVerifEmail, codigoEmail, setCodigoEmail, enviandoEmail, verificandoEmail, codigoDevEmail,
+  onEnviarCodigoEmail, onVerificarEmail, onCancelarVerifEmail
+}: Readonly<{
+  usuario: Usuario;
+  mostrarVerifEmail: boolean;
+  codigoEmail: string;
+  setCodigoEmail: (v: string) => void;
+  enviandoEmail: boolean;
+  verificandoEmail: boolean;
+  codigoDevEmail: string;
+  onEnviarCodigoEmail: () => void;
+  onVerificarEmail: () => void;
+  onCancelarVerifEmail: () => void;
+}>) {
+  return (
+    <div style={{ background: 'white', borderRadius: '20px', padding: '28px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0' }}>
+      <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Shield size={14} color="white" />
+        </div>
+        Seguridad y verificaciones
+      </h3>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <FilaEmailSeguridad
+          usuario={usuario}
+          mostrarVerifEmail={mostrarVerifEmail}
+          codigoEmail={codigoEmail}
+          setCodigoEmail={setCodigoEmail}
+          enviandoEmail={enviandoEmail}
+          verificandoEmail={verificandoEmail}
+          codigoDevEmail={codigoDevEmail}
+          onEnviarCodigoEmail={onEnviarCodigoEmail}
+          onVerificarEmail={onVerificarEmail}
+          onCancelarVerifEmail={onCancelarVerifEmail}
+        />
+
+        <FilaTelefonoSeguridad usuario={usuario} />
+
+        {/* Contraseña */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f0f0f0', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #22c55e, #16a34a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Shield size={18} color="white" />
+            </div>
+            <div>
+              <p style={{ color: '#0f172a', fontSize: '14px', fontWeight: 700, marginBottom: '2px' }}>Contraseña</p>
+              <p style={{ color: '#64748b', fontSize: '12px' }}>••••••••••</p>
+            </div>
+          </div>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#f0fdf4', color: '#16a34a', fontSize: '12px', fontWeight: 700, padding: '6px 14px', borderRadius: '50px', border: '1px solid #bbf7d0' }}>
+            <CheckCircle size={13} /> Configurada
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Tab "Mi perfil": compone las 3 tarjetas ---
+function SeccionPerfil({
+  usuario, mostrarVerifEmail, codigoEmail, setCodigoEmail, enviandoEmail, verificandoEmail, codigoDevEmail,
+  onAbrirCamara, onEnviarCodigoEmail, onVerificarEmail, onCancelarVerifEmail
+}: Readonly<{
+  usuario: Usuario;
+  mostrarVerifEmail: boolean;
+  codigoEmail: string;
+  setCodigoEmail: (v: string) => void;
+  enviandoEmail: boolean;
+  verificandoEmail: boolean;
+  codigoDevEmail: string;
+  onAbrirCamara: () => void;
+  onEnviarCodigoEmail: () => void;
+  onVerificarEmail: () => void;
+  onCancelarVerifEmail: () => void;
+}>) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <TarjetaInfoPersonal usuario={usuario} />
+      <TarjetaReconocimientoFacial usuario={usuario} onAbrirCamara={onAbrirCamara} />
+      <TarjetaSeguridad
+        usuario={usuario}
+        mostrarVerifEmail={mostrarVerifEmail}
+        codigoEmail={codigoEmail}
+        setCodigoEmail={setCodigoEmail}
+        enviandoEmail={enviandoEmail}
+        verificandoEmail={verificandoEmail}
+        codigoDevEmail={codigoDevEmail}
+        onEnviarCodigoEmail={onEnviarCodigoEmail}
+        onVerificarEmail={onVerificarEmail}
+        onCancelarVerifEmail={onCancelarVerifEmail}
+      />
+    </div>
+  );
+}
+
+// --- Tab "Mis compras" ---
+function SeccionCompras({ ordenes }: Readonly<{ ordenes: Orden[] }>) {
+  return (
+    <div style={{ background: 'white', borderRadius: '20px', padding: '28px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0' }}>
+      <h2 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ShoppingBag size={14} color="white" />
+        </div>
+        Mis compras
+      </h2>
+      {ordenes.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 24px' }}>
+          <div style={{ width: '72px', height: '72px', background: '#f1f5f9', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <ShoppingBag size={32} color="#cbd5e1" />
+          </div>
+          <p style={{ fontWeight: 800, color: '#0f172a', marginBottom: '8px', fontSize: '16px' }}>Aún no tienes compras</p>
+          <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '24px' }}>Encuentra tus fotos en los eventos y descárgalas en HD</p>
+          <Link href="/" style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', padding: '11px 24px', borderRadius: '10px', textDecoration: 'none', fontWeight: 700, fontSize: '14px' }}>
+            Explorar eventos
+          </Link>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {ordenes.map((orden) => (
+            <div key={orden.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', border: '1px solid #f0f0f0', borderRadius: '14px', background: '#f8fafc', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ShoppingBag size={18} color="white" />
+                </div>
+                <div>
+                  <p style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '2px' }}>{orden.evento.nombre}</p>
+                  <p style={{ color: '#94a3b8', fontSize: '12px' }}>{orden.evento.ciudad} · {new Date(orden.created_at).toLocaleDateString('es-EC')}</p>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontWeight: 900, color: '#0ea5e9', fontSize: '17px', marginBottom: '4px' }}>${orden.total_usd}</p>
+                <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '50px', backgroundColor: orden.status === 'PAGADO' ? '#f0fdf4' : '#fef9c3', color: orden.status === 'PAGADO' ? '#16a34a' : '#854d0e', border: `1px solid ${orden.status === 'PAGADO' ? '#bbf7d0' : '#fde68a'}` }}>
+                  {orden.status}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PerfilPage() {
   const router = useRouter();
   const [usuario, setUsuario] = useState<Usuario | null>(null);
@@ -102,6 +495,11 @@ export default function PerfilPage() {
     } finally {
       setVerificandoEmail(false);
     }
+  };
+
+  const cancelarVerifEmail = () => {
+    setMostrarVerifEmail(false);
+    setCodigoEmail('');
   };
 
   // ---- CÁMARA ----
@@ -259,279 +657,35 @@ export default function PerfilPage() {
         </div>
 
         {tab === 'perfil' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-            {/* Info personal */}
-            <div style={{ background: 'white', borderRadius: '20px', padding: '28px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0' }}>
-              <h2 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Camera size={14} color="white" />
-                </div>
-                Información personal
-              </h2>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                {[
-                  { label: 'NOMBRE COMPLETO', value: usuario.nombre },
-                  { label: 'CORREO ELECTRÓNICO', value: usuario.email },
-                  { label: 'TELÉFONO', value: usuario.phone || 'No registrado' },
-                  { label: 'MIEMBRO DESDE', value: new Date(usuario.created_at).toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' }) },
-                ].map((campo) => (
-                  <div key={campo.label} style={{ padding: '14px 16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #f0f0f0' }}>
-                    <p style={{ color: '#94a3b8', fontSize: '10px', fontWeight: 700, marginBottom: '6px', letterSpacing: '0.8px' }}>{campo.label}</p>
-                    <p style={{ color: '#0f172a', fontSize: '14px', fontWeight: 700 }}>{campo.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Reconocimiento facial */}
-            <div style={{ background: 'white', borderRadius: '20px', padding: '28px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '18px' }}>
-                <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: usuario.avatar_url ? 'linear-gradient(135deg, #0ea5e9, #6366f1)' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Camera size={22} color={usuario.avatar_url ? 'white' : '#94a3b8'} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', margin: 0 }}>Reconocimiento facial</h3>
-                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '50px', backgroundColor: usuario.avatar_url ? '#f0fdf4' : '#fef9c3', color: usuario.avatar_url ? '#16a34a' : '#854d0e', border: `1px solid ${usuario.avatar_url ? '#bbf7d0' : '#fde68a'}` }}>
-                      {usuario.avatar_url ? '✓ Activo' : '⏳ Pendiente'}
-                    </span>
-                  </div>
-                  <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '16px', lineHeight: 1.6 }}>
-                    {usuario.avatar_url ? 'Tu selfie está activa. Te encontramos automáticamente en los eventos.' : 'Activa el reconocimiento facial para encontrarte automáticamente en las fotos de tus carreras.'}
-                  </p>
-                  <button onClick={abrirCamara}
-                    style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
-                    <Camera size={14} />
-                    {usuario.avatar_url ? 'Actualizar selfie' : 'Activar ahora'}
-                  </button>
-                </div>
-                {usuario.avatar_url && (
-                  <div style={{ width: '68px', height: '68px', borderRadius: '12px', overflow: 'hidden', border: '2px solid #0ea5e9', flexShrink: 0 }}>
-                    <img src={usuario.avatar_url} alt="selfie" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Seguridad — con verificación */}
-            <div style={{ background: 'white', borderRadius: '20px', padding: '28px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Shield size={14} color="white" />
-                </div>
-                Seguridad y verificaciones
-              </h3>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-                {/* Email */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f0f0f0', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: usuario.email_verified ? 'linear-gradient(135deg, #22c55e, #16a34a)' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Mail size={18} color={usuario.email_verified ? 'white' : '#94a3b8'} />
-                    </div>
-                    <div>
-                      <p style={{ color: '#0f172a', fontSize: '14px', fontWeight: 700, marginBottom: '2px' }}>Correo electrónico</p>
-                      <p style={{ color: '#64748b', fontSize: '12px' }}>{usuario.email}</p>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    {usuario.email_verified ? (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#f0fdf4', color: '#16a34a', fontSize: '12px', fontWeight: 700, padding: '6px 14px', borderRadius: '50px', border: '1px solid #bbf7d0' }}>
-                        <CheckCircle size={13} /> Verificado
-                      </span>
-                    ) : (
-                      <>
-                        <span style={{ background: '#fef9c3', color: '#854d0e', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '50px', border: '1px solid #fde68a' }}>
-                          Sin verificar
-                        </span>
-                        <button onClick={enviarCodigoEmail} disabled={enviandoEmail}
-                          style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: 700, cursor: enviandoEmail ? 'not-allowed' : 'pointer', opacity: enviandoEmail ? 0.7 : 1 }}>
-                          {enviandoEmail ? 'Enviando...' : 'Verificar ahora'}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Modal verificación email inline */}
-                {mostrarVerifEmail && !usuario.email_verified && (
-                  <div style={{ padding: '20px', background: 'linear-gradient(135deg, rgba(14,165,233,0.05), rgba(99,102,241,0.05))', borderRadius: '14px', border: '1px solid rgba(14,165,233,0.2)' }}>
-                    <p style={{ color: '#0f172a', fontSize: '14px', fontWeight: 700, marginBottom: '6px' }}>
-                      Ingresa el código enviado a <span style={{ color: '#0ea5e9' }}>{usuario.email}</span>
-                    </p>
-                    {codigoDevEmail && (
-                      <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', color: '#92400e', marginBottom: '12px' }}>
-                        Modo desarrollo — Código: <strong>{codigoDevEmail}</strong>
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <input
-                        type="text" maxLength={6} value={codigoEmail}
-                        onChange={(e) => setCodigoEmail(e.target.value.replace(/\D/g, ''))}
-                        placeholder="000000"
-                        style={{ width: '140px', border: '2px solid #e2e8f0', borderRadius: '10px', padding: '10px 14px', fontSize: '20px', fontWeight: 800, color: '#0f172a', outline: 'none', textAlign: 'center', letterSpacing: '6px', backgroundColor: 'white' }}
-                        onFocus={(e) => { e.target.style.borderColor = '#0ea5e9'; }}
-                        onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; }}
-                      />
-                      <button onClick={verificarEmail} disabled={verificandoEmail || codigoEmail.length !== 6}
-                        style={{ background: codigoEmail.length === 6 ? 'linear-gradient(135deg, #0ea5e9, #6366f1)' : '#e2e8f0', color: codigoEmail.length === 6 ? 'white' : '#94a3b8', border: 'none', borderRadius: '10px', padding: '10px 20px', fontSize: '13px', fontWeight: 700, cursor: codigoEmail.length === 6 ? 'pointer' : 'not-allowed' }}>
-                        {verificandoEmail ? 'Verificando...' : 'Confirmar'}
-                      </button>
-                      <button onClick={() => { setMostrarVerifEmail(false); setCodigoEmail(''); }}
-                        style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>
-                        Cancelar
-                      </button>
-                    </div>
-                    <button onClick={enviarCodigoEmail} disabled={enviandoEmail}
-                      style={{ background: 'none', border: 'none', color: '#0ea5e9', fontSize: '12px', fontWeight: 600, cursor: 'pointer', marginTop: '8px', padding: 0 }}>
-                      {enviandoEmail ? 'Enviando...' : '¿No recibiste el código? Reenviar'}
-                    </button>
-                  </div>
-                )}
-
-                {/* Teléfono */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f0f0f0', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: usuario.phone ? 'linear-gradient(135deg, #22c55e, #16a34a)' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Phone size={18} color={usuario.phone ? 'white' : '#94a3b8'} />
-                    </div>
-                    <div>
-                      <p style={{ color: '#0f172a', fontSize: '14px', fontWeight: 700, marginBottom: '2px' }}>Teléfono</p>
-                      <p style={{ color: '#64748b', fontSize: '12px' }}>{usuario.phone || 'No registrado'}</p>
-                    </div>
-                  </div>
-                  {usuario.phone ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#f0fdf4', color: '#16a34a', fontSize: '12px', fontWeight: 700, padding: '6px 14px', borderRadius: '50px', border: '1px solid #bbf7d0' }}>
-                      <CheckCircle size={13} /> Registrado
-                    </span>
-                  ) : (
-                    <span style={{ background: '#f1f5f9', color: '#94a3b8', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '50px' }}>
-                      No agregado
-                    </span>
-                  )}
-                </div>
-
-                {/* Contraseña */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f0f0f0', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #22c55e, #16a34a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Shield size={18} color="white" />
-                    </div>
-                    <div>
-                      <p style={{ color: '#0f172a', fontSize: '14px', fontWeight: 700, marginBottom: '2px' }}>Contraseña</p>
-                      <p style={{ color: '#64748b', fontSize: '12px' }}>••••••••••</p>
-                    </div>
-                  </div>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#f0fdf4', color: '#16a34a', fontSize: '12px', fontWeight: 700, padding: '6px 14px', borderRadius: '50px', border: '1px solid #bbf7d0' }}>
-                    <CheckCircle size={13} /> Configurada
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <SeccionPerfil
+            usuario={usuario}
+            mostrarVerifEmail={mostrarVerifEmail}
+            codigoEmail={codigoEmail}
+            setCodigoEmail={setCodigoEmail}
+            enviandoEmail={enviandoEmail}
+            verificandoEmail={verificandoEmail}
+            codigoDevEmail={codigoDevEmail}
+            onAbrirCamara={abrirCamara}
+            onEnviarCodigoEmail={enviarCodigoEmail}
+            onVerificarEmail={verificarEmail}
+            onCancelarVerifEmail={cancelarVerifEmail}
+          />
         )}
 
-        {tab === 'compras' && (
-          <div style={{ background: 'white', borderRadius: '20px', padding: '28px 32px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ShoppingBag size={14} color="white" />
-              </div>
-              Mis compras
-            </h2>
-            {ordenes.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 24px' }}>
-                <div style={{ width: '72px', height: '72px', background: '#f1f5f9', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                  <ShoppingBag size={32} color="#cbd5e1" />
-                </div>
-                <p style={{ fontWeight: 800, color: '#0f172a', marginBottom: '8px', fontSize: '16px' }}>Aún no tienes compras</p>
-                <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '24px' }}>Encuentra tus fotos en los eventos y descárgalas en HD</p>
-                <Link href="/" style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', padding: '11px 24px', borderRadius: '10px', textDecoration: 'none', fontWeight: 700, fontSize: '14px' }}>
-                  Explorar eventos
-                </Link>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {ordenes.map((orden) => (
-                  <div key={orden.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', border: '1px solid #f0f0f0', borderRadius: '14px', background: '#f8fafc', flexWrap: 'wrap', gap: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <ShoppingBag size={18} color="white" />
-                      </div>
-                      <div>
-                        <p style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '2px' }}>{orden.evento.nombre}</p>
-                        <p style={{ color: '#94a3b8', fontSize: '12px' }}>{orden.evento.ciudad} · {new Date(orden.created_at).toLocaleDateString('es-EC')}</p>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontWeight: 900, color: '#0ea5e9', fontSize: '17px', marginBottom: '4px' }}>${orden.total_usd}</p>
-                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '50px', backgroundColor: orden.status === 'PAGADO' ? '#f0fdf4' : '#fef9c3', color: orden.status === 'PAGADO' ? '#16a34a' : '#854d0e', border: `1px solid ${orden.status === 'PAGADO' ? '#bbf7d0' : '#fde68a'}` }}>
-                        {orden.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {tab === 'compras' && <SeccionCompras ordenes={ordenes} />}
       </div>
 
-      {/* MODAL CÁMARA */}
       {mostrarCamara && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.88)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '24px', overflow: 'hidden', width: '100%', maxWidth: '720px', display: 'flex', position: 'relative' }}>
-            <button onClick={cerrarCamara}
-              style={{ position: 'absolute', top: '14px', left: '14px', zIndex: 10, width: '30px', height: '30px', backgroundColor: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', color: 'white', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              ✕
-            </button>
-            <div style={{ flex: 1, backgroundColor: '#000', position: 'relative', minHeight: '360px' }}>
-              {!fotoCapturada ? (
-                <>
-                  <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)' }}>
-                    <button onClick={tomarFoto}
-                      style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: 'white', border: '3px solid rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
-                      <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Camera size={22} color="white" />
-                      </div>
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <img src={fotoCapturada} alt="Selfie" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  <button onClick={reintentar}
-                    style={{ position: 'absolute', bottom: '20px', right: '20px', backgroundColor: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: '44px', height: '44px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <RotateCcw size={18} />
-                  </button>
-                </>
-              )}
-              <canvas ref={canvasRef} style={{ display: 'none' }} />
-            </div>
-            <div style={{ width: '240px', padding: '28px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '14px' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ width: '48px', height: '48px', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                  <Camera size={22} color="white" />
-                </div>
-                <p style={{ color: '#0f172a', fontWeight: 800, fontSize: '15px', marginBottom: '6px' }}>
-                  {!fotoCapturada ? 'Tómate una selfie' : '¿Se ve bien?'}
-                </p>
-                <p style={{ color: '#64748b', fontSize: '12px', lineHeight: 1.5 }}>
-                  {!fotoCapturada ? 'Esta foto activa el reconocimiento automático en los eventos' : 'Confirma tu selfie para activar el reconocimiento facial'}
-                </p>
-              </div>
-              {fotoCapturada && (
-                <button onClick={guardarSelfie} disabled={guardandoSelfie}
-                  style={{ width: '100%', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', color: 'white', border: 'none', padding: '12px', borderRadius: '10px', fontWeight: 700, fontSize: '14px', cursor: guardandoSelfie ? 'not-allowed' : 'pointer', opacity: guardandoSelfie ? 0.7 : 1 }}>
-                  {guardandoSelfie ? 'Guardando...' : 'Confirmar'}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <ModalCamaraPerfil
+          fotoCapturada={fotoCapturada}
+          guardandoSelfie={guardandoSelfie}
+          videoRef={videoRef}
+          canvasRef={canvasRef}
+          onCerrar={cerrarCamara}
+          onTomarFoto={tomarFoto}
+          onReintentar={reintentar}
+          onGuardar={guardarSelfie}
+        />
       )}
     </div>
   );

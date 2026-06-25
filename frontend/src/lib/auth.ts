@@ -11,7 +11,7 @@ export const cerrarSesion = () => {
   localStorage.removeItem('role');
   document.cookie = 'token=; path=/; max-age=0';
   document.cookie = 'role=; path=/; max-age=0';
-  window.location.href = '/';
+  globalThis.location.href = '/';
 };
 
 export const obtenerToken = () => localStorage.getItem('token');

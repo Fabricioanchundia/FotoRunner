@@ -39,6 +39,8 @@ export default function LoginPage() {
     }
   };
 
+  const hrefRegistro = redirect ? `/registro?redirect=${redirect}` : '/registro';
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: 'white' }}>
 
@@ -67,34 +69,36 @@ export default function LoginPage() {
 
             {/* Email */}
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>
+              <label htmlFor="login-email" style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>
                 Email
               </label>
               <input
+                id="login-email"
                 type="email" required
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="johndoe@gmail.com"
                 style={{ width: '100%', border: '2px solid #e5e7eb', borderRadius: '12px', padding: '12px 16px', fontSize: '14px', color: '#0f172a', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
-                onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#0ea5e9'; }}
-                onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#e5e7eb'; }}
+                onFocus={(e) => { e.target.style.borderColor = '#0ea5e9'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#e5e7eb'; }}
               />
             </div>
 
             {/* Contraseña */}
             <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>
+              <label htmlFor="login-password" style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>
                 Contraseña
               </label>
               <div style={{ position: 'relative' }}>
                 <input
+                  id="login-password"
                   type={verPassword ? 'text' : 'password'} required
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   placeholder="Introduce tu contraseña aquí"
                   style={{ width: '100%', border: '2px solid #e5e7eb', borderRadius: '12px', padding: '12px 48px 12px 16px', fontSize: '14px', color: '#0f172a', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
-                  onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = '#0ea5e9'; }}
-                  onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = '#e5e7eb'; }}
+                  onFocus={(e) => { e.target.style.borderColor = '#0ea5e9'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#e5e7eb'; }}
                 />
                 <button type="button" onClick={() => setVerPassword(!verPassword)}
                   style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
@@ -132,7 +136,7 @@ export default function LoginPage() {
 
           <p style={{ textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
             ¿Aún no estás registrado?{' '}
-            <Link href={`/registro${redirect ? `?redirect=${redirect}` : ''}`}
+            <Link href={hrefRegistro}
               style={{ color: '#0ea5e9', fontWeight: 700, textDecoration: 'none' }}>
               Regístrate
             </Link>

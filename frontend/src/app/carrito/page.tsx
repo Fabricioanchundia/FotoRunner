@@ -15,25 +15,23 @@ type Plan = 'individual' | 'photopass';
 
 // --- Selector de plan (individual vs photopass) ---
 // Extraído del componente principal para mantener su complejidad cognitiva
-// baja. Cada tarjeta es clicable pero no es un <button> nativo, así que
-// se le agrega role/tabIndex/teclado para accesibilidad.
-function SelectorPlan({ plan, onSelect, items }: {
+// baja. Cada tarjeta es un <button> nativo (no un div con role), porque
+// no tiene ningún elemento interactivo anidado adentro.
+function SelectorPlan({ plan, onSelect, items }: Readonly<{
   plan: Plan;
   onSelect: (p: Plan) => void;
   items: CarritoItem[];
-}) {
+}>) {
   return (
     <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0' }}>
       <h2 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '16px' }}>Elige tu plan</h2>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
 
         {/* Plan individual */}
-        <div
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           onClick={() => onSelect('individual')}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect('individual'); } }}
-          style={{ padding: '20px', borderRadius: '14px', border: `2px solid ${plan === 'individual' ? '#0ea5e9' : '#e2e8f0'}`, cursor: 'pointer', background: plan === 'individual' ? 'linear-gradient(135deg, rgba(14,165,233,0.05), rgba(99,102,241,0.05))' : 'white', transition: 'all 0.15s', position: 'relative' }}>
+          style={{ textAlign: 'left', font: 'inherit', padding: '20px', borderRadius: '14px', border: `2px solid ${plan === 'individual' ? '#0ea5e9' : '#e2e8f0'}`, cursor: 'pointer', background: plan === 'individual' ? 'linear-gradient(135deg, rgba(14,165,233,0.05), rgba(99,102,241,0.05))' : 'white', transition: 'all 0.15s', position: 'relative' }}>
           {plan === 'individual' && (
             <div style={{ position: 'absolute', top: '10px', right: '10px', width: '18px', height: '18px', borderRadius: '50%', background: 'linear-gradient(135deg, #0ea5e9, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ color: 'white', fontSize: '10px', fontWeight: 900 }}>✓</span>
@@ -50,15 +48,13 @@ function SelectorPlan({ plan, onSelect, items }: {
             ${(items.length * PRECIO_INDIVIDUAL).toFixed(2)}
           </p>
           <p style={{ color: '#94a3b8', fontSize: '11px' }}>${PRECIO_INDIVIDUAL} por foto</p>
-        </div>
+        </button>
 
         {/* Photopass */}
-        <div
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           onClick={() => onSelect('photopass')}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect('photopass'); } }}
-          style={{ padding: '20px', borderRadius: '14px', border: `2px solid ${plan === 'photopass' ? '#6366f1' : '#e2e8f0'}`, cursor: 'pointer', background: plan === 'photopass' ? 'linear-gradient(135deg, rgba(99,102,241,0.05), rgba(139,92,246,0.05))' : 'white', transition: 'all 0.15s', position: 'relative' }}>
+          style={{ textAlign: 'left', font: 'inherit', padding: '20px', borderRadius: '14px', border: `2px solid ${plan === 'photopass' ? '#6366f1' : '#e2e8f0'}`, cursor: 'pointer', background: plan === 'photopass' ? 'linear-gradient(135deg, rgba(99,102,241,0.05), rgba(139,92,246,0.05))' : 'white', transition: 'all 0.15s', position: 'relative' }}>
           {/* Badge recomendado */}
           <div style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg, #f59e0b, #ef4444)', color: 'white', fontSize: '10px', fontWeight: 800, padding: '3px 10px', borderRadius: '50px', whiteSpace: 'nowrap' }}>
             MEJOR VALOR
@@ -79,19 +75,19 @@ function SelectorPlan({ plan, onSelect, items }: {
             ${PRECIO_PHOTOPASS}
           </p>
           <p style={{ color: '#94a3b8', fontSize: '11px' }}>Acceso ilimitado al evento</p>
-        </div>
+        </button>
       </div>
     </div>
   );
 }
 
 // --- Lista de fotos en el carrito ---
-function ListaCarrito({ items, onQuitar, onLimpiar, onAmpliar }: {
+function ListaCarrito({ items, onQuitar, onLimpiar, onAmpliar }: Readonly<{
   items: CarritoItem[];
   onQuitar: (fotoId: string) => void;
   onLimpiar: () => void;
   onAmpliar: (item: CarritoItem) => void;
-}) {
+}>) {
   return (
     <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid #f0f0f0' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -107,17 +103,15 @@ function ListaCarrito({ items, onQuitar, onLimpiar, onAmpliar }: {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {items.map((item) => (
           <div key={item.foto_id} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 16px', backgroundColor: '#f8fafc', borderRadius: '14px', border: '1px solid #f0f0f0' }}>
-            <div
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               onClick={() => onAmpliar(item)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAmpliar(item); } }}
-              style={{ position: 'relative', width: '160px', height: '110px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, backgroundColor: '#e2e8f0', cursor: 'pointer' }}>
+              style={{ padding: 0, border: 'none', position: 'relative', width: '160px', height: '110px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0, backgroundColor: '#e2e8f0', cursor: 'pointer' }}>
               <img src={item.foto_url} alt="foto"
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/160x110?text=Foto'; }} />
               <div style={WATERMARK_STYLE} />
-            </div>
+            </button>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {item.event_nombre}
@@ -142,7 +136,7 @@ function ListaCarrito({ items, onQuitar, onLimpiar, onAmpliar }: {
 // --- Resumen del pedido (código promo + total + botón comprar) ---
 function ResumenPedido({
   plan, items, codigoPromo, setCodigoPromo, aplicarCodigo, calcularTotal, comprar, procesando, logueado
-}: {
+}: Readonly<{
   plan: Plan;
   items: CarritoItem[];
   codigoPromo: string;
@@ -152,7 +146,7 @@ function ResumenPedido({
   comprar: () => void;
   procesando: boolean;
   logueado: boolean;
-}) {
+}>) {
   // Extraído para no anidar ternarios directamente en el JSX (sonarqube:S3358).
   let lineaPlan: string;
   if (plan === 'individual') {
@@ -255,17 +249,20 @@ function ResumenPedido({
 
 // --- Modal de foto ampliada — siempre con marca de agua, igual que en la
 // galería del evento. La versión sin marca solo se entrega tras el pago
-// confirmado, nunca antes (ver lógica en `comprar`). ---
-function ModalFotoAmpliada({ foto, onClose }: { foto: CarritoItem; onClose: () => void }) {
+// confirmado, nunca antes (ver lógica en `comprar`).
+// El fondo es un <button> independiente (hermano del panel, no padre) —
+// así puede ser un elemento nativo accesible sin terminar anidando el
+// botón "cerrar" o el contenido dentro de otro botón. ---
+function ModalFotoAmpliada({ foto, onClose }: Readonly<{ foto: CarritoItem; onClose: () => void }>) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClose}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') { onClose(); } }}
-      style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-      <div role="presentation" onClick={(e) => e.stopPropagation()}
-        style={{ position: 'relative', maxWidth: '700px', width: '100%', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <button
+        type="button"
+        aria-label="Cerrar vista previa"
+        onClick={onClose}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none', padding: 0, backgroundColor: 'rgba(0,0,0,0.7)', cursor: 'pointer' }} />
+      <div
+        style={{ position: 'relative', zIndex: 1, maxWidth: '700px', width: '100%', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
         <img src={foto.foto_url} alt="Vista previa"
           style={{ width: '100%', display: 'block', maxHeight: '80vh', objectFit: 'contain', backgroundColor: '#000' }} />
         <div style={WATERMARK_STYLE} />

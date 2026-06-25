@@ -84,19 +84,13 @@ export default function AdminFotosPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
         {filtradas.map((foto) => (
           <div key={foto.id}
-            style={{ backgroundColor: '#1d1a38', borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(165,180,252,0.1)', transition: 'border-color 0.2s' }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(129,140,248,0.5)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(165,180,252,0.1)'; }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(129,140,248,0.5)'; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(165,180,252,0.1)'; }}>
+            style={{ backgroundColor: '#1d1a38', borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(165,180,252,0.1)' }}>
 
             {/* Imagen */}
-            <div
-              role="button"
-              tabIndex={0}
-              style={{ position: 'relative', aspectRatio: '4/3', backgroundColor: '#0f172a', cursor: 'pointer' }}
-              onClick={() => setFotoAmpliada(foto)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFotoAmpliada(foto); } }}>
+            <button
+              type="button"
+              style={{ width: '100%', padding: 0, border: 'none', font: 'inherit', color: 'inherit', position: 'relative', aspectRatio: '4/3', backgroundColor: '#0f172a', cursor: 'pointer' }}
+              onClick={() => setFotoAmpliada(foto)}>
               <img
                 src={foto.gcs_watermark_url || foto.gcs_original_url}
                 alt="foto"
@@ -109,7 +103,7 @@ export default function AdminFotosPage() {
               <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: foto.processed_at ? 'rgba(34,197,94,0.85)' : 'rgba(0,0,0,0.6)', color: 'white', fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '50px' }}>
                 {foto.processed_at ? '✓ Procesada' : '⏳ Pendiente'}
               </div>
-            </div>
+            </button>
 
             {/* Info */}
             <div style={{ padding: '12px 14px' }}>
@@ -177,13 +171,13 @@ export default function AdminFotosPage() {
 
       {/* MODAL FOTO AMPLIADA */}
       {fotoAmpliada && (
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setFotoAmpliada(null)}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') { setFotoAmpliada(null); } }}
-          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.92)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div role="presentation" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '100%', position: 'relative' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <button
+            type="button"
+            aria-label="Cerrar vista previa"
+            onClick={() => setFotoAmpliada(null)}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none', padding: 0, backgroundColor: 'rgba(0,0,0,0.92)', cursor: 'pointer' }} />
+          <div style={{ position: 'relative', zIndex: 1, maxWidth: '800px', width: '100%' }}>
             <img
               src={fotoAmpliada.gcs_watermark_url || fotoAmpliada.gcs_original_url}
               alt="Foto ampliada"

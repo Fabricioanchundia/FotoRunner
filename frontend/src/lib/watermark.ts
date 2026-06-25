@@ -5,7 +5,7 @@
 // Replica el estilo de la plataforma de referencia: patrón de
 // "transparencia" tipo checkerboard + rejilla de líneas punteadas
 // conectando íconos + leyendas "Foto protegida" / "No tomes captura de
-// pantalla" + nombre de marca grande en diagonal. Todo en un solo SVG de
+// pantalla" + nombre de marca grande en diagonal. Es un solo SVG de
 // tamaño fijo: NO se repite vía CSS, porque el texto grande se duplicaría
 // si se usara como mosaico. Se estira con backgroundSize: '100% 100%'.
 const WATERMARK_SVG = encodeURIComponent(`

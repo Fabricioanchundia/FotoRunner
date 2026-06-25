@@ -8,7 +8,7 @@ export interface CarritoItem {
 const CLAVE = 'fotorunner_carrito';
 
 export const obtenerCarrito = (): CarritoItem[] => {
-  if (typeof window === 'undefined') return [];
+  if (globalThis.window === undefined) return [];
   try {
     return JSON.parse(localStorage.getItem(CLAVE) || '[]');
   } catch { return []; }
